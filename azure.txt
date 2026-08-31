@@ -1,0 +1,16 @@
+关于具体地址
+仓库目前只有抽象层接口和 Mock 适配器，真实的 Azure endpoint 没有写入配置文件。实际联调前需要：
+
+在 Azure 门户创建对应资源（Speech、Translator、OpenAI）。
+将资源的 region 设为 japaneast。
+得到每个资源的 endpoint + key，写入服务端配置或密钥管理（Vault / KMS）。
+常见 Endpoint 模板（以实际资源为准）：
+
+Azure Speech
+REST TTS：https://japaneast.tts.speech.microsoft.com/cognitiveservices/v1
+WebSocket STT：wss://japaneast.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1
+Azure Translator
+全局：https://api.cognitive.microsofttranslator.com/translate?api-version=3.0
+区域：https://japaneast.api.cognitive.microsofttranslator.com/...
+Azure OpenAI
+https://<your-resource>.openai.azure.com/openai/deployments/<deployment>/chat/completions?api-version=<version>
