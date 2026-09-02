@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: aicard
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/aicard}
+    username: ${DB_USER:aicard}
+    password: ${DB_PASSWORD:aicard}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+    deserialization:
+      fail-on-unknown-properties: false
+azure:
+  speech:
+    key: ${AZURE_SPEECH_KEY:}
+    region: ${AZURE_SPEECH_REGION:japaneast}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

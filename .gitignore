@@ -8,6 +8,10 @@
 .env
 .env.*
 
+# 本地测试脚本（含真实 Azure 密钥，绝不入库）
+outputs/
+outputs.zip
+
 # Java 编译产物
 target/
 *.class

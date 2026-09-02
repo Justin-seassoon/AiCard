@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: aicard-postgres
+    environment:
+      POSTGRES_DB: aicard
+      POSTGRES_USER: aicard
+      POSTGRES_PASSWORD: aicard
+    ports:
+      - "5432:5432"
+    volumes:
+      - aicard_pgdata:/var/lib/postgresql/data
+
+volumes:
+  aicard_pgdata:
