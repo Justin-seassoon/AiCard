@@ -14,3 +14,8 @@ Azure Translator
 区域：https://japaneast.api.cognitive.microsofttranslator.com/...
 Azure OpenAI
 https://<your-resource>.openai.azure.com/openai/deployments/<deployment>/chat/completions?api-version=<version>
+
+
+#SDK文档 ：
+https://learn.microsoft.com/zh-cn/azure/ai-services/speech-service/
+
