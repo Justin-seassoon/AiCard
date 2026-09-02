@@ -101,13 +101,13 @@ public class GatewayTransportHandler extends AbstractWebSocketHandler {
             throw new IllegalStateException("device not authenticated");
         }
         String scope = msg.scope() != null ? msg.scope() : "translate";
-        String translationMode = msg.translationMode() != null ? msg.translationMode() : "auto";
+        String translationMode = msg.translationMode() != null ? msg.translationMode() : "fixed";
         String staffLanguage = msg.staffLanguage() != null ? msg.staffLanguage() : "ja-JP";
         SessionContext ctx = sessions.create(msg.sessionId(), device.getDeviceId(),
                 device.getCustomerId(), device.getStoreId(), scope, translationMode, staffLanguage,
                 out -> sendText(session, out),
                 frame -> sendBinary(session, frame));
-        ctx.langPair(msg.langPair());
+        ctx.langPair(msg.langPair() != null ? msg.langPair() : "zh-ja");
         session.getAttributes().put(ATTR_SESSION, ctx);
         states.markOnline(device.getDeviceId());
     }
