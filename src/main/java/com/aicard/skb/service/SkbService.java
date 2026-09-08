@@ -37,10 +37,10 @@ public class SkbService {
         this.thetaCheck = thetaCheck;
     }
 
-    public SkbResult answer(String question, Long customerId, Long storeId) {
+    public SkbResult answer(String question, Long customerId, Long storeId, String domain) {
         // ① 检索段
         List<Float> qVec = embeddings.embed(question);
-        List<RetrievedChunk> hits = store.searchSimilar(customerId, storeId, qVec, TOP_K);
+        List<RetrievedChunk> hits = store.searchSimilar(customerId, storeId, domain, qVec, TOP_K);
         if (hits.isEmpty() || hits.get(0).similarity() < thetaRetr) {
             return SkbResult.noMatch();
         }

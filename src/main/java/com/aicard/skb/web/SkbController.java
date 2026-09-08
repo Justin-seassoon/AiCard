@@ -27,14 +27,16 @@ public class SkbController {
     @GetMapping("/api/skb/answer")
     public SkbResult answer(@RequestParam String question,
                             @RequestParam(defaultValue = "1") Long customerId,
-                            @RequestParam(defaultValue = "1") Long storeId) {
-        return service.answer(question, customerId, storeId);
+                            @RequestParam(defaultValue = "1") Long storeId,
+                            @RequestParam(defaultValue = "skb") String domain) {
+        return service.answer(question, customerId, storeId, domain);
     }
 
     @GetMapping("/api/skb/documents")
     public List<DocumentView> documents(@RequestParam(defaultValue = "1") Long customerId,
-                                        @RequestParam(defaultValue = "1") Long storeId) {
-        return store.listDocuments(customerId, storeId).stream()
+                                        @RequestParam(defaultValue = "1") Long storeId,
+                                        @RequestParam(defaultValue = "skb") String domain) {
+        return store.listDocuments(customerId, storeId, domain).stream()
                 .map(doc -> new DocumentView(doc.title(),
                         store.listChunks(doc.id()).stream()
                                 .map(c -> parseQa(c.text()))

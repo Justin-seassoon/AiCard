@@ -44,6 +44,9 @@ public class KnowledgeSeeder implements CommandLineRunner {
     @Value("${skb.seed.store-id:1}")
     private Long storeId;
 
+    @Value("${skb.seed.domain:skb}")
+    private String domain;
+
     public KnowledgeSeeder(KnowledgeStore store, EmbeddingProvider embeddings) {
         this.store = store;
         this.embeddings = embeddings;
@@ -66,7 +69,7 @@ public class KnowledgeSeeder implements CommandLineRunner {
         int total = 0;
         for (MarkdownQaParser.Topic topic : topics) {
             Document doc = store.insertDocument(new Document(
-                    null, customerId, storeId, topic.title(), "v1", "published", Instant.now()));
+                    null, customerId, storeId, topic.title(), "v1", "published", domain, Instant.now()));
             int idx = 0;
             for (MarkdownQaParser.Qa qa : topic.pairs()) {
                 String text = "Q: " + qa.question() + " A: " + qa.answer();

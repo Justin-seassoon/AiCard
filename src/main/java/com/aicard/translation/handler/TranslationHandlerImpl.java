@@ -257,7 +257,7 @@ public class TranslationHandlerImpl implements TranslationHandler {
 
     private SkbResult tryVkb(String question, SessionContext ctx) {
         try {
-            return skbService.answer(question, ctx.customerId(), ctx.storeId());
+            return skbService.answer(question, ctx.customerId(), ctx.storeId(), "vkb");
         } catch (Exception e) {
             return null; // 撞 VKB 失败，降级为播原文
         }

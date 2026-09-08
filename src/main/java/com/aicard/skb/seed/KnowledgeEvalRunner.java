@@ -67,7 +67,7 @@ public class KnowledgeEvalRunner implements CommandLineRunner {
         System.out.println("=== 知识库检索质量评估开始（共 " + QUESTIONS.size() + " 题）===\n");
         for (int i = 0; i < QUESTIONS.size(); i++) {
             String q = QUESTIONS.get(i);
-            SkbResult r = service.answer(q, customerId, storeId);
+            SkbResult r = service.answer(q, customerId, storeId, "skb");
             boolean isOk = "ok".equals(r.status());
             if (isOk) {
                 ok++;

@@ -33,8 +33,9 @@ public class DocumentController {
     @PostMapping
     public Long importDocument(@RequestBody DocumentImportRequest req) {
         Tenant t = TenantContext.require();
+        String domain = req.domain() == null || req.domain().isBlank() ? "skb" : req.domain();
         Document doc = store.insertDocument(new Document(null, t.customerId(), t.storeId(),
-                req.title(), req.version(), "draft", Instant.now()));
+                req.title(), req.version(), "draft", domain, Instant.now()));
         int i = 0;
         for (DocumentImportRequest.ChunkIn c : req.chunks()) {
             store.insertChunk(new Chunk(null, doc.id(), t.customerId(), t.storeId(), i++, c.text()),

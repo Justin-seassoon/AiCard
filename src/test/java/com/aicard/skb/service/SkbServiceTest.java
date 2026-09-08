@@ -14,6 +14,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -28,10 +29,10 @@ class SkbServiceTest {
     void answersWithValidCitations() {
         embeddings.setVector(List.of(1.0f, 0.0f));
         RetrievedChunk hit = new RetrievedChunk(42L, "早餐 7:00-10:00", "早餐FAQ", "v1", 0.95);
-        when(store.searchSimilar(anyLong(), anyLong(), anyList(), anyInt())).thenReturn(List.of(hit));
+        when(store.searchSimilar(anyLong(), anyLong(), anyString(), anyList(), anyInt())).thenReturn(List.of(hit));
         llm.setResult(new LlmResult("早餐 7:00-10:00", List.of(42L)));
 
-        SkbResult r = service.answer("早餐几点", 1L, 2L);
+        SkbResult r = service.answer("早餐几点", 1L, 2L, "skb");
 
         assertThat(r.status()).isEqualTo("ok");
         assertThat(r.answer()).isEqualTo("早餐 7:00-10:00");
@@ -41,9 +42,9 @@ class SkbServiceTest {
     @Test
     void noMatchWhenRetrievalEmpty() {
         embeddings.setVector(List.of(1.0f, 0.0f));
-        when(store.searchSimilar(anyLong(), anyLong(), anyList(), anyInt())).thenReturn(List.of());
+        when(store.searchSimilar(anyLong(), anyLong(), anyString(), anyList(), anyInt())).thenReturn(List.of());
 
-        SkbResult r = service.answer("无答案问题", 1L, 2L);
+        SkbResult r = service.answer("无答案问题", 1L, 2L, "skb");
 
         assertThat(r.status()).isEqualTo("no_match");
     }
@@ -52,10 +53,10 @@ class SkbServiceTest {
     void blocksFabricatedCitation() {
         embeddings.setVector(List.of(1.0f, 0.0f));
         RetrievedChunk hit = new RetrievedChunk(42L, "早餐", "早餐FAQ", "v1", 0.95);
-        when(store.searchSimilar(anyLong(), anyLong(), anyList(), anyInt())).thenReturn(List.of(hit));
+        when(store.searchSimilar(anyLong(), anyLong(), anyString(), anyList(), anyInt())).thenReturn(List.of(hit));
         llm.setResult(new LlmResult("编造答案", List.of(999L))); // 引用不存在的片段
 
-        SkbResult r = service.answer("早餐几点", 1L, 2L);
+        SkbResult r = service.answer("早餐几点", 1L, 2L, "skb");
 
         assertThat(r.status()).isEqualTo("no_match");
     }

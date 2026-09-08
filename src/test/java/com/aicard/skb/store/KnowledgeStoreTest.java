@@ -38,11 +38,11 @@ class KnowledgeStoreTest {
 
     @Test
     void searchesSimilarChunksWithinTenant() {
-        Document doc = store.insertDocument(new Document(null, 1L, 2L, "早餐FAQ", "v1", "published", Instant.now()));
+        Document doc = store.insertDocument(new Document(null, 1L, 2L, "早餐FAQ", "v1", "published", "skb", Instant.now()));
         store.insertChunk(new Chunk(null, doc.id(), 1L, 2L, 0, "早餐时间为 7:00-10:00"), MockEmbeddingProvider.oneHot(0));
         store.insertChunk(new Chunk(null, doc.id(), 9L, 9L, 1, "另一租户早餐时间"), MockEmbeddingProvider.oneHot(0));
 
-        List<RetrievedChunk> hits = store.searchSimilar(1L, 2L, MockEmbeddingProvider.oneHot(0), 5);
+        List<RetrievedChunk> hits = store.searchSimilar(1L, 2L, "skb", MockEmbeddingProvider.oneHot(0), 5);
 
         assertThat(hits).hasSize(1);
         assertThat(hits.get(0).documentTitle()).isEqualTo("早餐FAQ");

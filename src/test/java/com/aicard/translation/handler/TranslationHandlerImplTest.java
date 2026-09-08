@@ -208,7 +208,7 @@ class TranslationHandlerImplTest {
         TranslationOrchestrator orchestrator = mock(TranslationOrchestrator.class);
         SpeechProvider speech = mock(SpeechProvider.class);
         TurnSession turn = mock(TurnSession.class);
-        when(skbService.answer(any(), any(), any()))
+        when(skbService.answer(any(), any(), any(), any()))
                 .thenReturn(SkbResult.ok("朝食は6時半から9時半です", List.of("餐饮@v1#1")));
         when(llm.translate(any(), any())).thenReturn("早餐6点半到9点半");
         when(speech.synthesize(any(), any())).thenReturn(new byte[]{1, 2, 3});

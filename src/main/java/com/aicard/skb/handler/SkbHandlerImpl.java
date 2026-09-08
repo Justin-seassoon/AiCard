@@ -54,7 +54,7 @@ public class SkbHandlerImpl implements SkbHandler {
             return;
         }
 
-        SkbResult result = service.answer(question, ctx.customerId(), ctx.storeId());
+        SkbResult result = service.answer(question, ctx.customerId(), ctx.storeId(), "skb");
 
         byte[] tts;
         try {
