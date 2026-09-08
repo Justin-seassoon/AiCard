@@ -15,4 +15,16 @@ public interface SpeechProvider {
 
     /** 一步流式语音翻译 + TTS：语音 → 译文语音分片（onAudioChunk 回调），返回译文文本。 */
     SpeechTranslationResult translateToSpeech(byte[] audio, String src, String tgt, Consumer<byte[]> onAudioChunk);
+
+    /** 语音转文本（ASR）。员工知识库问答用 staff_language 转写。 */
+    String transcribe(byte[] audio, String language);
+
+    /** 文本转语音（TTS），返回 PCM 音频字节。 */
+    byte[] synthesize(String text, String language);
+
+    /** 开启流式翻译 turn（fixed 模式）：边 push 音频边识别/翻译/流式合成语音。 */
+    TurnSession startTurn(String src, String tgt, Consumer<byte[]> onTtsAudioChunk);
+
+    /** 开启一步 auto-detect 流式翻译 turn（auto 模式）：自动检测源语言并翻译到 tgt。 */
+    TurnSession startTurnAuto(List<String> candidates, String tgt, Consumer<byte[]> onTtsAudioChunk);
 }
