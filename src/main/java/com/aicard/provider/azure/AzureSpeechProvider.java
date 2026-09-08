@@ -12,7 +12,6 @@ import com.microsoft.cognitiveservices.speech.SpeechConfig;
 import com.microsoft.cognitiveservices.speech.SpeechRecognitionResult;
 import com.microsoft.cognitiveservices.speech.SpeechRecognizer;
 import com.microsoft.cognitiveservices.speech.SpeechSynthesizer;
-import com.microsoft.cognitiveservices.speech.SpeechSynthesisOutputFormat;
 import com.microsoft.cognitiveservices.speech.audio.AudioConfig;
 import com.microsoft.cognitiveservices.speech.audio.AudioInputStream;
 import com.microsoft.cognitiveservices.speech.audio.AudioStreamFormat;
@@ -76,7 +75,6 @@ public class AzureSpeechProvider implements SpeechProvider {
         config.setSpeechRecognitionLanguage(toLocale(src));
         config.addTargetLanguage(tgt);
         config.setVoiceName(voiceFor(tgt)); // speech-to-speech：翻译后合成 target 语音
-        config.setSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm);
 
         PushAudioInputStream pushStream = AudioInputStream.createPushStream(
                 AudioStreamFormat.getWaveFormatPCM(SAMPLE_RATE, BITS_PER_SAMPLE, CHANNELS));
@@ -142,7 +140,6 @@ public class AzureSpeechProvider implements SpeechProvider {
     public byte[] synthesize(String text, String language) {
         SpeechConfig config = SpeechConfig.fromSubscription(key, region);
         config.setSpeechSynthesisVoiceName(voiceFor(language));
-        config.setSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (SpeechSynthesizer synthesizer = new SpeechSynthesizer(config, null)) {
             synthesizer.Synthesizing.addEventListener((o, e) -> {
@@ -164,7 +161,6 @@ public class AzureSpeechProvider implements SpeechProvider {
         config.setSpeechRecognitionLanguage(toLocale(src));
         config.addTargetLanguage(tgt);
         config.setVoiceName(voiceFor(tgt));
-        config.setSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm);
 
         PushAudioInputStream pushStream = AudioInputStream.createPushStream(
                 AudioStreamFormat.getWaveFormatPCM(SAMPLE_RATE, BITS_PER_SAMPLE, CHANNELS));
@@ -214,7 +210,6 @@ public class AzureSpeechProvider implements SpeechProvider {
         SpeechTranslationConfig config = SpeechTranslationConfig.fromSubscription(key, region);
         config.addTargetLanguage(tgt);
         config.setVoiceName(voiceFor(tgt));
-        config.setSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm);
 
         AutoDetectSourceLanguageConfig autoDetect = AutoDetectSourceLanguageConfig.fromLanguages(candidates);
 
