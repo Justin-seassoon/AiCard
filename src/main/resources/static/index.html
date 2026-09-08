@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>知識ベース検索テスト</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif;
+    background: #f5f7fa; color: #1a1a1a; padding: 24px; line-height: 1.6;
+  }
+  .container { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 22px; color: #0f2a4a; margin-bottom: 4px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 20px; }
+  .input-row { display: flex; gap: 8px; margin-bottom: 12px; }
+  input[type="text"] {
+    flex: 1; padding: 12px 14px; font-size: 16px; border: 1px solid #c9d4de;
+    border-radius: 6px; outline: none;
+  }
+  input[type="text"]:focus { border-color: #2e6da4; }
+  button.primary {
+    padding: 12px 20px; font-size: 16px; background: #2e6da4; color: #fff;
+    border: none; border-radius: 6px; cursor: pointer;
+  }
+  button.primary:hover { background: #255a87; }
+
+  .result-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 18px; margin-bottom: 12px;
+  }
+  .q { font-weight: 600; margin-bottom: 8px; color: #0f2a4a; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-right: 8px; }
+  .badge.ok { background: #e6f4ea; color: #1a7f37; }
+  .badge.no_match { background: #fdecea; color: #c62828; }
+  .answer { margin: 8px 0; font-size: 15px; }
+  .refs { font-size: 12px; color: #666; }
+  .refs ul { margin: 4px 0 0 18px; }
+  .muted { color: #999; }
+
+  .kb-head { margin: 28px 0 12px; font-size: 18px; color: #0f2a4a; border-bottom: 2px solid #0f2a4a; padding-bottom: 6px; }
+  .kb-hint { color: #888; font-size: 13px; margin-bottom: 14px; }
+  details {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px;
+    padding: 10px 14px;
+  }
+  summary { cursor: pointer; font-weight: 600; color: #0f2a4a; font-size: 15px; }
+  .qa { padding: 8px 0; border-bottom: 1px dashed #eef2f6; }
+  .qa:last-child { border-bottom: none; }
+  .qa-q { font-weight: 600; color: #1a1a1a; }
+  .qa-a { color: #444; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>知識ベース検索テスト</h1>
+  <p class="subtitle">下の入力欄に日本語で質問すると、知識ベースの検索結果が表示されます。下の一覧で、知識ベースに収録されている内容を確認できます。</p>
+
+  <div class="input-row">
+    <input type="text" id="question" placeholder="質問を入力（例：朝食は何時からですか？）" autofocus>
+    <button class="primary" onclick="ask()">テスト</button>
+  </div>
+
+  <div id="result"></div>
+
+  <div class="kb-head">知識ベース収録内容（全問答）</div>
+  <p class="kb-hint">下の各テーマをクリックして展開し、収録済みの質問と回答を確認できます。</p>
+  <div id="kb"></div>
+</div>
+
+<script>
+  function ask() {
+    var q = document.getElementById('question').value.trim();
+    if (!q) return;
+    run(q);
+  }
+
+  function run(q) {
+    var box = document.getElementById('result');
+    box.innerHTML = '<div class="result-card"><span class="muted">検索中…</span></div>';
+    fetch('/api/skb/answer?question=' + encodeURIComponent(q))
+      .then(function (r) { return r.json(); })
+      .then(function (d) { renderResult(q, d); })
+      .catch(function (e) { box.innerHTML = '<div class="result-card"><span class="muted">エラー：' + e + '</span></div>'; });
+  }
+
+  function renderResult(q, d) {
+    var ok = d.status === 'ok';
+    var badge = ok ? '<span class="badge ok">命中 (ok)</span>' : '<span class="badge no_match">未命中 (no_match)</span>';
+    var refs = (d.source_refs && d.source_refs.length)
+      ? '<div class="refs">引用：<ul>' + d.source_refs.map(function (s) { return '<li>' + escapeHtml(s) + '</li>'; }).join('') + '</ul></div>'
+      : '';
+    document.getElementById('result').innerHTML =
+      '<div class="result-card">'
+      + '<div class="q">Q：' + escapeHtml(q) + '</div>'
+      + badge
+      + '<div class="answer">' + escapeHtml(d.answer || '') + '</div>'
+      + refs
+      + '</div>';
+  }
+
+  function loadKb() {
+    fetch('/api/skb/documents')
+      .then(function (r) { return r.json(); })
+      .then(function (docs) { renderKb(docs); })
+      .catch(function (e) { document.getElementById('kb').innerHTML = '<span class="muted">読み込み失敗：' + e + '</span>'; });
+  }
+
+  function renderKb(docs) {
+    var html = '';
+    (docs || []).forEach(function (doc) {
+      html += '<details><summary>' + escapeHtml(doc.title) + '</summary>';
+      (doc.qas || []).forEach(function (qa) {
+        html += '<div class="qa"><div class="qa-q">Q：' + escapeHtml(qa.question) + '</div>'
+              + '<div class="qa-a">A：' + escapeHtml(qa.answer) + '</div></div>';
+      });
+      html += '</details>';
+    });
+    document.getElementById('kb').innerHTML = html;
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  loadKb();
+</script>
+</body>
+</html>
