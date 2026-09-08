@@ -19,6 +19,14 @@ azure:
   speech:
     key: ${AZURE_SPEECH_KEY:}
     region: ${AZURE_SPEECH_REGION:japaneast}
+  openai:
+    endpoint: ${AZURE_OPENAI_ENDPOINT:}
+    key: ${AZURE_OPENAI_KEY:}
+    embedding-deployment: ${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:text-embedding-3-small}
+aibridgex:
+  base-url: ${AIBRIDGEX_BASE_URL:https://api.aibridgex.net/v1}
+  key: ${AIBRIDGEX_KEY:}
+  model: ${AIBRIDGEX_MODEL:deepseek-v4-flash}
 management:
   endpoints:
     web:
