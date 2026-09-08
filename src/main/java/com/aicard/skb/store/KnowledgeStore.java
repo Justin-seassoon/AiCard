@@ -89,4 +89,8 @@ public class KnowledgeStore {
                 rs.getLong("id"), rs.getLong("document_id"), rs.getLong("customer_id"),
                 rs.getLong("store_id"), rs.getInt("chunk_index"), rs.getString("text")), documentId);
     }
+
+    public void publishDocument(Long id) {
+        jdbc.update("UPDATE document SET status = 'published' WHERE id = ?", id);
+    }
 }

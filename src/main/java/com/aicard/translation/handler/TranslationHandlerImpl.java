@@ -6,6 +6,8 @@ import com.aicard.gateway.protocol.InboundMessage;
 import com.aicard.gateway.protocol.OutboundMessage;
 import com.aicard.gateway.protocol.TtsAudioFrame;
 import com.aicard.gateway.session.SessionContext;
+import com.aicard.ingestion.model.TranslationSample;
+import com.aicard.ingestion.service.IngestionService;
 import com.aicard.provider.api.ProviderException;
 import com.aicard.provider.api.SpeechProvider;
 import com.aicard.provider.api.SpeechTranslationResult;
@@ -24,12 +26,14 @@ import java.util.concurrent.ConcurrentHashMap;
  * 翻译链路处理器：「边说边识别」流式。
  * fixed 模式：按 lang_pair 流式翻译；auto 模式：counterparty（游客）一步 auto-detect 流式，
  * wearer（员工）保持累积（依赖软锁定 visitor_language）。软锁定状态按 session 维护。
+ * 翻译完成后异步 tee 到旁路采集（不阻塞主链路）。
  */
 @Component
 public class TranslationHandlerImpl implements TranslationHandler {
 
     private final TranslationOrchestrator orchestrator;
     private final SpeechProvider speech;
+    private final IngestionService ingestion;
     private final ConcurrentHashMap<String, TranslationSessionState> states = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ByteArrayOutputStream> buffers = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, TurnSession> fixedTurns = new ConcurrentHashMap<>();
@@ -38,9 +42,11 @@ public class TranslationHandlerImpl implements TranslationHandler {
     private static final List<String> DEFAULT_CANDIDATES = List.of("ja-JP", "zh-CN", "en-US", "ko-KR");
     private static final int CHUNK_SIZE = 8000;
 
-    public TranslationHandlerImpl(TranslationOrchestrator orchestrator, SpeechProvider speech) {
+    public TranslationHandlerImpl(TranslationOrchestrator orchestrator, SpeechProvider speech,
+                                  IngestionService ingestion) {
         this.orchestrator = orchestrator;
         this.speech = speech;
+        this.ingestion = ingestion;
     }
 
     @Override
@@ -98,13 +104,16 @@ public class TranslationHandlerImpl implements TranslationHandler {
         // fixed 流式收口
         if ("fixed".equals(ctx.translationMode()) && fixedTurns.containsKey(turnId)) {
             TurnSession turn = fixedTurns.remove(turnId);
+            SpeechTranslationResult result;
             try {
-                turn.finish();
+                result = turn.finish();
             } catch (ProviderException e) {
                 ctx.sendText(OutboundMessage.builder().type("error").sessionId(ctx.sessionId()).turnId(turnId)
                         .code("E_PROVIDER").message("please repeat").build());
                 return;
             }
+            String[] d = fixedDirection(msg.sourceSide(), ctx.langPair());
+            recordSample(ctx, msg, result, d[0], d[1], null);
             ctx.sendText(OutboundMessage.builder().type("tts_end").sessionId(ctx.sessionId()).turnId(turnId).build());
             ctx.sendText(OutboundMessage.builder().type("language_state").sessionId(ctx.sessionId()).turnId(turnId)
                     .visitorLanguage("UNKNOWN").state("unknown").build());
@@ -127,6 +136,7 @@ public class TranslationHandlerImpl implements TranslationHandler {
             if (!"UNKNOWN".equals(visitor)) {
                 states.computeIfAbsent(ctx.sessionId(), s -> new TranslationSessionState()).lock(visitor);
             }
+            recordSample(ctx, msg, result, result.detectedLanguage(), ctx.staffLanguage(), null);
             ctx.sendText(OutboundMessage.builder().type("tts_end").sessionId(ctx.sessionId()).turnId(turnId).build());
             ctx.sendText(OutboundMessage.builder().type("language_state").sessionId(ctx.sessionId()).turnId(turnId)
                     .visitorLanguage(visitor).state("UNKNOWN".equals(visitor) ? "unknown" : "locked").build());
@@ -178,6 +188,14 @@ public class TranslationHandlerImpl implements TranslationHandler {
         return b == null ? new byte[0] : b.toByteArray();
     }
 
+    private void recordSample(SessionContext ctx, InboundMessage msg, SpeechTranslationResult result,
+                              String srcLang, String tgtLang, Double lidConfidence) {
+        ingestion.record(new TranslationSample(
+                ctx.customerId(), ctx.storeId(), ctx.sessionId(), msg.turnId(),
+                srcLang, tgtLang, result.finalText(), result.translatedText(),
+                lidConfidence, msg.sourceSide()));
+    }
+
     /** fixed 模式方向：sourceSide 0=wearer(员工) 1=counterparty(游客)，lang_pair 形如 "zh-ja"。 */
     private static String[] direction(byte sourceSide, String langPair) {
         String[] pair = langPair == null ? new String[]{"zh", "ja"} : langPair.split("-");
@@ -186,6 +204,17 @@ public class TranslationHandlerImpl implements TranslationHandler {
         }
         String src = sourceSide == 0 ? pair[1] : pair[0];
         String tgt = sourceSide == 0 ? pair[0] : pair[1];
+        return new String[]{src, tgt};
+    }
+
+    /** fixed 模式方向（String sourceSide 版，供旁路采集用）。 */
+    private static String[] fixedDirection(String sourceSide, String langPair) {
+        String[] pair = langPair == null ? new String[]{"zh", "ja"} : langPair.split("-");
+        if (pair.length < 2) {
+            pair = new String[]{"zh", "ja"};
+        }
+        String src = "wearer".equals(sourceSide) ? pair[1] : pair[0];
+        String tgt = "wearer".equals(sourceSide) ? pair[0] : pair[1];
         return new String[]{src, tgt};
     }
 
