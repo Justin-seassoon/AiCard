@@ -42,6 +42,11 @@ public class GatewayWebSocketHandler {
                 translation.onTranslationModeChange(ctx);
             }
             case "eou" -> routeEou(ctx, msg);
+            case "button_event" -> {
+                if (isTranslate(ctx)) {
+                    translation.onButtonEvent(ctx, msg);
+                }
+            }
             case "stop_tts" -> {
                 // staff_qa 的 stop_tts 停止答案播放由 P5 处理，此处仅翻译链路
                 if (isTranslate(ctx)) {

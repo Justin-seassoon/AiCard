@@ -35,6 +35,11 @@ public class AibridgexLlmProvider implements LLMProvider {
             6. 回答は日本語で、一文程度にしてください。
             """;
 
+    private static final String TRANSLATE_PROMPT = """
+            あなたは翻訳アシスタントです。与えられたテキストを指定された言語に翻訳してください。
+            翻訳結果だけを出力してください（説明や引用符は付けない）。
+            """;
+
     private final String baseUrl;
     private final String apiKey;
     private final String model;
@@ -79,6 +84,31 @@ public class AibridgexLlmProvider implements LLMProvider {
             return result != null ? result : new LlmResult("", List.of());
         } catch (Exception e) {
             throw new ProviderException("aibridgex llm failed", e);
+        }
+    }
+
+    @Override
+    public String translate(String text, String targetLang) {
+        String url = baseUrl + "/chat/completions";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", TRANSLATE_PROMPT),
+                        Map.of("role", "user", "content", "翻訳先言語: " + targetLang + "\nテキスト: " + text)));
+
+        try {
+            ResponseEntity<Map> resp = rest.postForEntity(url, new HttpEntity<>(body, headers), Map.class);
+            Map<String, Object> respBody = resp.getBody();
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) respBody.get("choices");
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            return (String) message.get("content");
+        } catch (Exception e) {
+            throw new ProviderException("aibridgex translate failed", e);
         }
     }
 
