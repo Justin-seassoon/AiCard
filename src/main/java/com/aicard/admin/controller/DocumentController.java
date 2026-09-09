@@ -39,6 +39,7 @@ public class DocumentController {
         int i = 0;
         for (DocumentImportRequest.ChunkIn c : req.chunks()) {
             store.insertChunk(new Chunk(null, doc.id(), t.customerId(), t.storeId(), i++, c.text()),
+                    embeddings.embed(c.text()),
                     embeddings.embed(c.text()));
         }
         return doc.id();

@@ -28,7 +28,7 @@ class SkbServiceTest {
     @Test
     void answersWithValidCitations() {
         embeddings.setVector(List.of(1.0f, 0.0f));
-        RetrievedChunk hit = new RetrievedChunk(42L, "早餐 7:00-10:00", "早餐FAQ", "v1", 0.95);
+        RetrievedChunk hit = new RetrievedChunk(42L, "早餐 7:00-10:00", "早餐FAQ", "v1", 0.95, List.of(1.0f, 0.0f));
         when(store.searchSimilar(anyLong(), anyLong(), anyString(), anyList(), anyInt())).thenReturn(List.of(hit));
         llm.setResult(new LlmResult("早餐 7:00-10:00", List.of(42L)));
 
@@ -52,7 +52,7 @@ class SkbServiceTest {
     @Test
     void blocksFabricatedCitation() {
         embeddings.setVector(List.of(1.0f, 0.0f));
-        RetrievedChunk hit = new RetrievedChunk(42L, "早餐", "早餐FAQ", "v1", 0.95);
+        RetrievedChunk hit = new RetrievedChunk(42L, "早餐", "早餐FAQ", "v1", 0.95, List.of(1.0f, 0.0f));
         when(store.searchSimilar(anyLong(), anyLong(), anyString(), anyList(), anyInt())).thenReturn(List.of(hit));
         llm.setResult(new LlmResult("编造答案", List.of(999L))); // 引用不存在的片段
 

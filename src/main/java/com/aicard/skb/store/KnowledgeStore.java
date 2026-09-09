@@ -11,6 +11,7 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 
 import java.sql.PreparedStatement;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -45,18 +46,19 @@ public class KnowledgeStore {
                 d.domain(), d.createdAt());
     }
 
-    public void insertChunk(Chunk c, List<Float> embedding) {
-        PGvector vec = new PGvector(embedding);
+    public void insertChunk(Chunk c, List<Float> questionEmbedding, List<Float> answerEmbedding) {
+        PGvector qVec = new PGvector(questionEmbedding);
+        PGvector aVec = new PGvector(answerEmbedding);
         jdbc.update(
-                "INSERT INTO chunk(document_id, customer_id, store_id, chunk_index, text, embedding) VALUES (?,?,?,?,?,?)",
-                c.documentId(), c.customerId(), c.storeId(), c.chunkIndex(), c.text(), vec);
+                "INSERT INTO chunk(document_id, customer_id, store_id, chunk_index, text, embedding, answer_embedding) VALUES (?,?,?,?,?,?,?)",
+                c.documentId(), c.customerId(), c.storeId(), c.chunkIndex(), c.text(), qVec, aVec);
     }
 
     public List<RetrievedChunk> searchSimilar(Long customerId, Long storeId, String domain,
                                               List<Float> embedding, int topK) {
         PGvector vec = new PGvector(embedding);
         String sql = """
-                SELECT c.id, c.text, d.title, d.version,
+                SELECT c.id, c.text, d.title, d.version, (c.answer_embedding)::real[] AS answer_embedding,
                        1 - (c.embedding <=> ?::vector) AS similarity
                 FROM chunk c JOIN document d ON c.document_id = d.id
                 WHERE c.customer_id = ? AND c.store_id = ? AND d.status = 'published' AND d.domain = ?
@@ -65,8 +67,21 @@ public class KnowledgeStore {
                 """;
         RowMapper<RetrievedChunk> mapper = (rs, i) -> new RetrievedChunk(
                 rs.getLong("id"), rs.getString("text"), rs.getString("title"),
-                rs.getString("version"), rs.getDouble("similarity"));
+                rs.getString("version"), rs.getDouble("similarity"),
+                toFloatList(rs.getArray("answer_embedding")));
         return jdbc.query(sql, mapper, vec, customerId, storeId, domain, vec, topK);
+    }
+
+    private static List<Float> toFloatList(java.sql.Array sqlArray) throws java.sql.SQLException {
+        if (sqlArray == null) {
+            return null;
+        }
+        Object[] items = (Object[]) sqlArray.getArray();
+        List<Float> list = new ArrayList<>(items.length);
+        for (Object item : items) {
+            list.add(((Number) item).floatValue());
+        }
+        return list;
     }
 
     public List<Document> listDocuments(Long customerId, Long storeId, String domain) {

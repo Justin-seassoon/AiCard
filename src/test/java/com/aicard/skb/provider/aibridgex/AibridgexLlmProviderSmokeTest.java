@@ -23,7 +23,7 @@ class AibridgexLlmProviderSmokeTest {
         List<RetrievedChunk> context = List.of(
                 new RetrievedChunk(42L,
                         "Q: 朝食は何時からですか？ A: 朝食は 6 時半から 9 時半まで、1 階レストランでご用意しております。",
-                        "餐饮服务", "v1", 0.9));
+                        "餐饮服务", "v1", 0.9, null));
 
         LlmResult r = p.generate("朝食は何時からですか？", context);
 

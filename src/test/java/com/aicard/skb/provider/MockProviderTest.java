@@ -29,7 +29,7 @@ class MockProviderTest {
     void llmReturnsConfiguredAnswerWithCitations() {
         MockLlmProvider p = new MockLlmProvider();
         p.setResult(new LlmResult("早餐 7:00-10:00", List.of(42L)));
-        RetrievedChunk c = new RetrievedChunk(42L, "早餐时间", "FAQ", "v1", 0.9);
+        RetrievedChunk c = new RetrievedChunk(42L, "早餐时间", "FAQ", "v1", 0.9, null);
         LlmResult r = p.generate("早餐几点", List.of(c));
         assertThat(r.answer()).isEqualTo("早餐 7:00-10:00");
         assertThat(r.citedChunkIds()).containsExactly(42L);

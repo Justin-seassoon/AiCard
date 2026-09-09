@@ -73,9 +73,10 @@ public class KnowledgeSeeder implements CommandLineRunner {
             int idx = 0;
             for (MarkdownQaParser.Qa qa : topic.pairs()) {
                 String text = "Q: " + qa.question() + " A: " + qa.answer();
-                // embedding 用「问题」而非「问题+答案」整体，避免答案稀释问题向量的相似度
+                // 检索用「问题」向量，校验用「答案」向量，避免问答全文稀释相似度
                 store.insertChunk(new Chunk(null, doc.id(), customerId, storeId, idx++, text),
-                        embeddings.embed(qa.question()));
+                        embeddings.embed(qa.question()),
+                        embeddings.embed(qa.answer()));
             }
             total += topic.pairs().size();
         }

@@ -76,8 +76,10 @@ public class SkbService {
         List<Float> aVec = embeddings.embed(answer);
         double max = 0.0;
         for (RetrievedChunk c : cited) {
-            List<Float> cVec = embeddings.embed(c.text());
-            max = Math.max(max, cosine(aVec, cVec));
+            if (c.answerEmbedding() == null) {
+                continue; // 旧数据未回填答案向量，跳过
+            }
+            max = Math.max(max, cosine(aVec, c.answerEmbedding()));
         }
         return max;
     }
