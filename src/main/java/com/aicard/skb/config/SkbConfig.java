@@ -6,6 +6,7 @@ import com.aicard.skb.provider.aibridgex.AibridgexLlmProvider;
 import com.aicard.skb.provider.azureopenai.AzureOpenAIEmbeddingProvider;
 import com.aicard.skb.provider.mock.MockEmbeddingProvider;
 import com.aicard.skb.provider.mock.MockLlmProvider;
+import com.aicard.skb.seed.KeywordExtractor;
 import com.aicard.skb.service.SkbService;
 import com.aicard.skb.store.KnowledgeStore;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,9 +55,15 @@ public class SkbConfig {
     }
 
     @Bean
+    public KeywordExtractor keywordExtractor() {
+        return new KeywordExtractor();
+    }
+
+    @Bean
     public SkbService skbService(EmbeddingProvider embeddings, KnowledgeStore store, LLMProvider llm,
+                                 KeywordExtractor keywordExtractor,
                                  @Value("${skb.theta-retr:0.55}") double thetaRetr,
                                  @Value("${skb.theta-check:0.6}") double thetaCheck) {
-        return new SkbService(embeddings, store, llm, thetaRetr, thetaCheck);
+        return new SkbService(embeddings, store, llm, keywordExtractor, thetaRetr, thetaCheck);
     }
 }

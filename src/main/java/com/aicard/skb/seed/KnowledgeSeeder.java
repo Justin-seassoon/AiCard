@@ -34,6 +34,7 @@ public class KnowledgeSeeder implements CommandLineRunner {
 
     private final KnowledgeStore store;
     private final EmbeddingProvider embeddings;
+    private final KeywordExtractor keywordExtractor;
 
     @Value("${skb.seed.files:}")
     private String files;
@@ -47,9 +48,10 @@ public class KnowledgeSeeder implements CommandLineRunner {
     @Value("${skb.seed.domain:skb}")
     private String domain;
 
-    public KnowledgeSeeder(KnowledgeStore store, EmbeddingProvider embeddings) {
+    public KnowledgeSeeder(KnowledgeStore store, EmbeddingProvider embeddings, KeywordExtractor keywordExtractor) {
         this.store = store;
         this.embeddings = embeddings;
+        this.keywordExtractor = keywordExtractor;
     }
 
     @Override
@@ -76,7 +78,8 @@ public class KnowledgeSeeder implements CommandLineRunner {
                 // 检索用「问题」向量，校验用「答案」向量，避免问答全文稀释相似度
                 store.insertChunk(new Chunk(null, doc.id(), customerId, storeId, idx++, text),
                         embeddings.embed(qa.question()),
-                        embeddings.embed(qa.answer()));
+                        embeddings.embed(qa.answer()),
+                        keywordExtractor.extract(qa.question()));
             }
             total += topic.pairs().size();
         }

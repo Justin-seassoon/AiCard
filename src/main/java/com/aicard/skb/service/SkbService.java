@@ -5,6 +5,7 @@ import com.aicard.skb.model.RetrievedChunk;
 import com.aicard.skb.model.SkbResult;
 import com.aicard.skb.provider.EmbeddingProvider;
 import com.aicard.skb.provider.LLMProvider;
+import com.aicard.skb.seed.KeywordExtractor;
 import com.aicard.skb.store.KnowledgeStore;
 
 import java.util.HashSet;
@@ -25,23 +26,30 @@ public class SkbService {
     private final EmbeddingProvider embeddings;
     private final KnowledgeStore store;
     private final LLMProvider llm;
+    private final KeywordExtractor keywordExtractor;
     private final double thetaRetr;
     private final double thetaCheck;
 
     public SkbService(EmbeddingProvider embeddings, KnowledgeStore store, LLMProvider llm,
-                      double thetaRetr, double thetaCheck) {
+                      KeywordExtractor keywordExtractor, double thetaRetr, double thetaCheck) {
         this.embeddings = embeddings;
         this.store = store;
         this.llm = llm;
+        this.keywordExtractor = keywordExtractor;
         this.thetaRetr = thetaRetr;
         this.thetaCheck = thetaCheck;
     }
 
     public SkbResult answer(String question, Long customerId, Long storeId, String domain) {
-        // ① 检索段
+        // ① 检索段：向量为主，miss 时关键词兜底
         List<Float> qVec = embeddings.embed(question);
         List<RetrievedChunk> hits = store.searchSimilar(customerId, storeId, domain, qVec, TOP_K);
         if (hits.isEmpty() || hits.get(0).similarity() < thetaRetr) {
+            List<String> kws = keywordExtractor.extract(question);
+            hits = kws.isEmpty() ? List.of()
+                    : store.searchByKeywords(customerId, storeId, domain, kws, TOP_K);
+        }
+        if (hits.isEmpty()) {
             return SkbResult.noMatch();
         }
 

@@ -5,6 +5,7 @@ import com.aicard.skb.model.RetrievedChunk;
 import com.aicard.skb.model.SkbResult;
 import com.aicard.skb.provider.mock.MockEmbeddingProvider;
 import com.aicard.skb.provider.mock.MockLlmProvider;
+import com.aicard.skb.seed.KeywordExtractor;
 import com.aicard.skb.store.KnowledgeStore;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +24,8 @@ class SkbServiceTest {
     private final KnowledgeStore store = mock(KnowledgeStore.class);
     private final MockEmbeddingProvider embeddings = new MockEmbeddingProvider();
     private final MockLlmProvider llm = new MockLlmProvider();
-    private final SkbService service = new SkbService(embeddings, store, llm, 0.7, 0.7);
+    private final KeywordExtractor keywordExtractor = new KeywordExtractor();
+    private final SkbService service = new SkbService(embeddings, store, llm, keywordExtractor, 0.7, 0.7);
 
     @Test
     void answersWithValidCitations() {
@@ -59,5 +61,18 @@ class SkbServiceTest {
         SkbResult r = service.answer("早餐几点", 1L, 2L, "skb");
 
         assertThat(r.status()).isEqualTo("no_match");
+    }
+
+    @Test
+    void fallsBackToKeywordsWhenVectorMisses() {
+        embeddings.setVector(List.of(1.0f, 0.0f));
+        when(store.searchSimilar(anyLong(), anyLong(), anyString(), anyList(), anyInt())).thenReturn(List.of());
+        RetrievedChunk hit = new RetrievedChunk(42L, "Q: 朝食は何時からですか A: 朝食は6時半からです", "餐饮", "v1", 2.0, List.of(1.0f, 0.0f));
+        when(store.searchByKeywords(anyLong(), anyLong(), anyString(), anyList(), anyInt())).thenReturn(List.of(hit));
+        llm.setResult(new LlmResult("朝食は6時半からです", List.of(42L)));
+
+        SkbResult r = service.answer("朝食は何時からですか", 1L, 2L, "skb");
+
+        assertThat(r.status()).isEqualTo("ok");
     }
 }

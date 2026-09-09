@@ -6,6 +6,7 @@ import com.aicard.common.tenant.TenantContext;
 import com.aicard.skb.model.Chunk;
 import com.aicard.skb.model.Document;
 import com.aicard.skb.provider.EmbeddingProvider;
+import com.aicard.skb.seed.KeywordExtractor;
 import com.aicard.skb.store.KnowledgeStore;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,10 +25,12 @@ public class DocumentController {
 
     private final KnowledgeStore store;
     private final EmbeddingProvider embeddings;
+    private final KeywordExtractor keywordExtractor;
 
-    public DocumentController(KnowledgeStore store, EmbeddingProvider embeddings) {
+    public DocumentController(KnowledgeStore store, EmbeddingProvider embeddings, KeywordExtractor keywordExtractor) {
         this.store = store;
         this.embeddings = embeddings;
+        this.keywordExtractor = keywordExtractor;
     }
 
     @PostMapping
@@ -40,7 +43,8 @@ public class DocumentController {
         for (DocumentImportRequest.ChunkIn c : req.chunks()) {
             store.insertChunk(new Chunk(null, doc.id(), t.customerId(), t.storeId(), i++, c.text()),
                     embeddings.embed(c.text()),
-                    embeddings.embed(c.text()));
+                    embeddings.embed(c.text()),
+                    keywordExtractor.extract(c.text()));
         }
         return doc.id();
     }

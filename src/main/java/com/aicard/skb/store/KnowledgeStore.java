@@ -46,12 +46,23 @@ public class KnowledgeStore {
                 d.domain(), d.createdAt());
     }
 
-    public void insertChunk(Chunk c, List<Float> questionEmbedding, List<Float> answerEmbedding) {
+    public void insertChunk(Chunk c, List<Float> questionEmbedding, List<Float> answerEmbedding,
+                            List<String> keywords) {
         PGvector qVec = new PGvector(questionEmbedding);
         PGvector aVec = new PGvector(answerEmbedding);
-        jdbc.update(
-                "INSERT INTO chunk(document_id, customer_id, store_id, chunk_index, text, embedding, answer_embedding) VALUES (?,?,?,?,?,?,?)",
-                c.documentId(), c.customerId(), c.storeId(), c.chunkIndex(), c.text(), qVec, aVec);
+        jdbc.update(con -> {
+            PreparedStatement ps = con.prepareStatement(
+                    "INSERT INTO chunk(document_id, customer_id, store_id, chunk_index, text, embedding, answer_embedding, keywords) VALUES (?,?,?,?,?,?,?,?)");
+            ps.setLong(1, c.documentId());
+            ps.setLong(2, c.customerId());
+            ps.setLong(3, c.storeId());
+            ps.setInt(4, c.chunkIndex());
+            ps.setString(5, c.text());
+            ps.setObject(6, qVec);
+            ps.setObject(7, aVec);
+            ps.setArray(8, con.createArrayOf("text", keywords.toArray()));
+            return ps;
+        });
     }
 
     public List<RetrievedChunk> searchSimilar(Long customerId, Long storeId, String domain,
@@ -70,6 +81,34 @@ public class KnowledgeStore {
                 rs.getString("version"), rs.getDouble("similarity"),
                 toFloatList(rs.getArray("answer_embedding")));
         return jdbc.query(sql, mapper, vec, customerId, storeId, domain, vec, topK);
+    }
+
+    public List<RetrievedChunk> searchByKeywords(Long customerId, Long storeId, String domain,
+                                                 List<String> keywords, int topK) {
+        String sql = """
+                SELECT c.id, c.text, d.title, d.version, (c.answer_embedding)::real[] AS answer_embedding,
+                       count(kw) AS kw_count
+                FROM chunk c
+                JOIN document d ON c.document_id = d.id
+                CROSS JOIN LATERAL unnest(c.keywords) AS kw
+                WHERE c.customer_id = ? AND c.store_id = ? AND d.status = 'published' AND d.domain = ?
+                  AND kw = ANY(?::text[])
+                GROUP BY c.id, c.text, d.title, d.version, c.answer_embedding
+                ORDER BY kw_count DESC
+                LIMIT ?
+                """;
+        RowMapper<RetrievedChunk> mapper = (rs, i) -> new RetrievedChunk(
+                rs.getLong("id"), rs.getString("text"), rs.getString("title"),
+                rs.getString("version"), rs.getDouble("kw_count"),
+                toFloatList(rs.getArray("answer_embedding")));
+        return jdbc.query(sql, ps -> {
+            java.sql.Array kwArray = ps.getConnection().createArrayOf("text", keywords.toArray());
+            ps.setLong(1, customerId);
+            ps.setLong(2, storeId);
+            ps.setString(3, domain);
+            ps.setArray(4, kwArray);
+            ps.setInt(5, topK);
+        }, mapper);
     }
 
     private static List<Float> toFloatList(java.sql.Array sqlArray) throws java.sql.SQLException {
