@@ -14,9 +14,11 @@ import com.aicard.skb.provider.LLMProvider;
 import com.aicard.skb.service.SkbService;
 import com.aicard.translation.orchestrate.TranslationOrchestrator;
 import com.aicard.translation.orchestrate.TranslationResult;
+import com.aicard.translation.qualify.UtteranceQualifier;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
@@ -36,6 +38,7 @@ class TranslationHandlerImplTest {
     private final IngestionService ingestion = mock(IngestionService.class);
     private final SkbService skbService = mock(SkbService.class);
     private final LLMProvider llm = mock(LLMProvider.class);
+    private final UtteranceQualifier qualifier = new UtteranceQualifier(0, false, Set.of(), Set.of());
 
     private static InboundMessage eou(String turnId) {
         return eou(turnId, "counterparty");
@@ -65,7 +68,7 @@ class TranslationHandlerImplTest {
 
         CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
         CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
-        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm);
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier);
         SessionContext ctx = ctx(textSent, binarySent, "auto");
 
         handler.onAudioChunk(ctx, new AudioChunkFrame("t1", 0, 1L, (byte) 0, (byte) 1, new byte[]{1, 2}));
@@ -87,7 +90,7 @@ class TranslationHandlerImplTest {
 
         CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
         CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
-        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm);
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier);
         SessionContext ctx = ctx(textSent, binarySent, "auto");
 
         handler.onAudioChunk(ctx, new AudioChunkFrame("t1", 0, 1L, (byte) 0, (byte) 1, new byte[]{1, 2}));
@@ -106,7 +109,7 @@ class TranslationHandlerImplTest {
 
         CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
         CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
-        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm);
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier);
         SessionContext ctx = ctx(textSent, binarySent, "fixed");
         ctx.langPair("zh-ja");
 
@@ -129,7 +132,7 @@ class TranslationHandlerImplTest {
 
         CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
         CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
-        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm);
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier);
         SessionContext ctx = ctx(textSent, binarySent, "fixed");
         ctx.langPair("zh-ja");
 
@@ -148,7 +151,7 @@ class TranslationHandlerImplTest {
 
         CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
         CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
-        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm);
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier);
         SessionContext ctx = ctx(textSent, binarySent, "fixed");
         ctx.langPair("zh-ja");
 
@@ -169,7 +172,7 @@ class TranslationHandlerImplTest {
 
         CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
         CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
-        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm);
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier);
         SessionContext ctx = ctx(textSent, binarySent, "auto");
 
         handler.onAudioChunk(ctx, new AudioChunkFrame("t1", 0, 1L, (byte) 1, (byte) 1, new byte[]{1, 2}));
@@ -193,7 +196,7 @@ class TranslationHandlerImplTest {
 
         CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
         CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
-        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm);
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier);
         SessionContext ctx = ctx(textSent, binarySent, "auto");
 
         handler.onAudioChunk(ctx, new AudioChunkFrame("t1", 0, 1L, (byte) 0, (byte) 1, new byte[]{1, 2}));
@@ -222,7 +225,7 @@ class TranslationHandlerImplTest {
 
         CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
         CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
-        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm);
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier);
         SessionContext ctx = ctx(textSent, binarySent, "auto");
 
         handler.onAudioChunk(ctx, new AudioChunkFrame("t1", 0, 1L, (byte) 1, (byte) 1, new byte[]{1, 2}));

@@ -23,6 +23,12 @@ azure:
     endpoint: ${AZURE_OPENAI_ENDPOINT:}
     key: ${AZURE_OPENAI_KEY:}
     embedding-deployment: ${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:text-embedding-3-small}
+translation:
+  qualify:
+    min-utt-duration-ms: 200        # spec 待定，联调可调
+    numeric-filter: true
+    whitelist: OK,Yes,No,Thank you,Thanks,Sorry,Hello,Hi,ありがとう,はい,いいえ,谢谢,是,不是,네,감사합니다
+    brand-terms: Visa, Mastercard, JCB, American Express, Amex, UnionPay, 銀聯, Alipay, WeChat Pay, PayPay, Suica, PASMO, iPhone, iPad, Apple Watch, MacBook, Apple, Sony, Canon, Nikon, Panasonic, Dyson, ダイソン, 資生堂, Shiseido, SK-II, KOSE, コーセー, 雪肌精, ファンケル, オルビス, 任天堂, Switch, Booking.com, Agoda, Expedia, 楽天トラベル, じゃらん, Trip.com, Airbnb
 aibridgex:
   base-url: ${AIBRIDGEX_BASE_URL:https://api.aibridgex.net/v1}
   key: ${AIBRIDGEX_KEY:}

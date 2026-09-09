@@ -18,7 +18,11 @@ import com.aicard.skb.service.SkbService;
 import com.aicard.translation.audio.BeepAudio;
 import com.aicard.translation.orchestrate.TranslationOrchestrator;
 import com.aicard.translation.orchestrate.TranslationResult;
+import com.aicard.translation.qualify.UtteranceQualifier;
+import com.aicard.translation.qualify.UtteranceQuality;
 import com.aicard.translation.state.TranslationSessionState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
@@ -43,11 +47,14 @@ import java.util.concurrent.TimeUnit;
 @Component
 public class TranslationHandlerImpl implements TranslationHandler {
 
+    private static final Logger log = LoggerFactory.getLogger(TranslationHandlerImpl.class);
+
     private final TranslationOrchestrator orchestrator;
     private final SpeechProvider speech;
     private final IngestionService ingestion;
     private final SkbService skbService;
     private final LLMProvider llm;
+    private final UtteranceQualifier qualifier;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     private final Map<String, TranslationSessionState> states = new ConcurrentHashMap<>();
@@ -62,12 +69,14 @@ public class TranslationHandlerImpl implements TranslationHandler {
     private static final long VKB_TIMEOUT_SECONDS = 5;
 
     public TranslationHandlerImpl(TranslationOrchestrator orchestrator, SpeechProvider speech,
-                                  IngestionService ingestion, SkbService skbService, LLMProvider llm) {
+                                  IngestionService ingestion, SkbService skbService, LLMProvider llm,
+                                  UtteranceQualifier qualifier) {
         this.orchestrator = orchestrator;
         this.speech = speech;
         this.ingestion = ingestion;
         this.skbService = skbService;
         this.llm = llm;
+        this.qualifier = qualifier;
     }
 
     @Override
@@ -154,8 +163,15 @@ public class TranslationHandlerImpl implements TranslationHandler {
             byte[] originalTts = extractTts(turnId);
             String visitor = result.detectedLanguage() != null && !result.detectedLanguage().isBlank()
                     ? result.detectedLanguage() : "UNKNOWN";
-            if (!"UNKNOWN".equals(visitor)) {
+            UtteranceQuality quality = qualifier.qualify(result.finalText(), msg.utteranceDurationMs());
+            // visitor_language 仅用于员工(wearer)方向的翻译目标语言；游客方向走一步 auto-detect 不读记忆。
+            // 已知局限（联调后评估防漂移）：换游客不重置记忆、同一游客夹杂语言时员工方向会漂移。
+            if (!"UNKNOWN".equals(visitor) && quality == UtteranceQuality.NORMAL) {
                 states.computeIfAbsent(ctx.sessionId(), s -> new TranslationSessionState()).lock(visitor);
+            }
+            if (quality != UtteranceQuality.NORMAL) {
+                log.info("quality gate filtered: session={} turn={} quality={} text={} durMs={}",
+                        ctx.sessionId(), turnId, quality, result.finalText(), msg.utteranceDurationMs());
             }
             recordSample(ctx, msg, result, result.detectedLanguage(), ctx.staffLanguage(), null);
 
