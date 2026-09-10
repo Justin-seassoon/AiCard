@@ -60,7 +60,7 @@
   <div class="card">
     <div class="row">
       <label>Host</label>
-      <input type="text" id="host" value="120.253.215.110:8080" style="max-width:220px;">
+      <input type="text" id="host" placeholder="留空则用当前地址（https 自动走 wss）" style="max-width:240px;">
       <label>device_id</label>
       <input type="text" id="deviceId" value="demo-device-001" style="max-width:150px;">
       <label>token</label>
@@ -163,10 +163,11 @@
 
   // ===== 连接 =====
   function connect() {
-    var host = $('host').value.trim();
+    var host = $('host').value.trim() || location.host;
+    var scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
     var deviceId = $('deviceId').value.trim();
     var token = $('token').value.trim();
-    var url = 'ws://' + host + '/ws?device_id=' + encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(token);
+    var url = scheme + host + '/ws?device_id=' + encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(token);
     log('连接 ' + url, 'sys');
     ws = new WebSocket(url);
     ws.binaryType = 'arraybuffer';
