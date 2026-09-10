@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 工牌 · 云端功能模拟器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif;
+    background: #0f2a4a; color: #1a1a1a; padding: 20px; line-height: 1.6;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 20px; color: #fff; margin-bottom: 2px; }
+  .subtitle { color: #9fb3c8; font-size: 12px; margin-bottom: 16px; }
+
+  .card { background: #fff; border-radius: 10px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+  .row label { font-size: 13px; color: #486581; white-space: nowrap; }
+  input[type="text"] { flex: 1; min-width: 160px; padding: 8px 10px; font-size: 14px; border: 1px solid #c9d4de; border-radius: 6px; }
+  select { padding: 8px 10px; font-size: 14px; border: 1px solid #c9d4de; border-radius: 6px; }
+
+  button { padding: 9px 16px; font-size: 14px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-primary { background: #2e6da4; color: #fff; }
+  .btn-danger { background: #c62828; color: #fff; }
+  .btn-ok { background: #1a7f37; color: #fff; }
+  .btn-neutral { background: #e2e8f0; color: #334e68; }
+
+  /* 角色切换 */
+  .role-switch { display: flex; gap: 6px; }
+  .role-switch button { flex: 1; padding: 12px; background: #e2e8f0; color: #486581; border: 2px solid transparent; }
+  .role-switch button.active { background: #d9eaf7; color: #0f2a4a; border-color: #2e6da4; }
+
+  /* PTT 大按钮 */
+  .ptt { width: 100%; padding: 28px; font-size: 20px; border-radius: 12px; background: #e2e8f0; color: #486581; transition: background .15s; }
+  .ptt.recording { background: #c62828; color: #fff; }
+
+  .status-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .status-item { flex: 1; min-width: 140px; background: #f0f4f8; border-radius: 8px; padding: 10px 12px; }
+  .status-item .k { font-size: 11px; color: #829ab1; }
+  .status-item .v { font-size: 16px; font-weight: 700; color: #0f2a4a; margin-top: 2px; }
+
+  .log { background: #102a43; color: #bcccdc; border-radius: 8px; padding: 12px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; height: 260px; overflow-y: auto; white-space: pre-wrap; word-break: break-all; }
+  .log .in { color: #6ee7b7; }
+  .log .out { color: #93c5fd; }
+  .log .err { color: #fca5a5; }
+  .log .sys { color: #a5b4c4; }
+
+  .vkb-hint { background: #fff8e1; border: 1px solid #ffd54f; border-radius: 8px; padding: 10px 12px; color: #8a6d00; font-size: 13px; display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>AI 工牌 · 云端功能模拟器</h1>
+  <p class="subtitle">浏览器模拟工牌端：麦克风 → 16kHz PCM → WSS → 云端翻译/知识库 → 外放 TTS。角色切换替代多路拾音（不仿真声学）。</p>
+
+  <!-- 连接 -->
+  <div class="card">
+    <div class="row">
+      <label>Host</label>
+      <input type="text" id="host" value="120.253.215.110:8080" style="max-width:220px;">
+      <label>device_id</label>
+      <input type="text" id="deviceId" value="demo-device-001" style="max-width:150px;">
+      <label>token</label>
+      <input type="text" id="token" value="demo-token-001" style="max-width:150px;">
+      <button id="btn-connect" class="btn-primary" onclick="connect()">连接</button>
+      <button id="btn-disconnect" class="btn-danger" onclick="disconnect()" disabled>断开</button>
+    </div>
+    <div class="row">
+      <label>scope</label>
+      <select id="scope">
+        <option value="translate">translate（翻译）</option>
+        <option value="staff_qa">staff_qa（员工问答）</option>
+      </select>
+      <label>模式</label>
+      <select id="mode" onchange="onModeChange()">
+        <option value="auto">auto（自动判语言）</option>
+        <option value="fixed" selected>fixed（固定语言对）</option>
+      </select>
+      <label>lang_pair</label>
+      <select id="langPair">
+        <option value="zh-ja" selected>zh-ja（中↔日）</option>
+        <option value="en-ja">en-ja（英↔日）</option>
+        <option value="ko-ja">ko-ja（韩↔日）</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- 角色 + 说话 -->
+  <div class="card">
+    <div class="row">
+      <label>当前说话人</label>
+      <div class="role-switch" style="flex:1;">
+        <button id="role-counterparty" class="active" onclick="setRole('counterparty')">游客（counterparty）</button>
+        <button id="role-wearer" onclick="setRole('wearer')">员工（wearer）</button>
+      </div>
+    </div>
+    <button id="ptt" class="ptt" onmousedown="startTalking()" onmouseup="stopTalking()" onmouseleave="stopTalking()" ontouchstart="startTalking()" ontouchend="stopTalking()">按住说话（松开即发送）</button>
+    <div class="row" style="margin-top:10px;">
+      <button class="btn-ok" onclick="sendOk()" style="flex:1;">✅ OK（模拟员工确认 VKB）</button>
+      <button class="btn-danger" onclick="sendStopTts()" style="flex:1;">⏹ 打断（stop_tts）</button>
+    </div>
+    <div class="vkb-hint" id="vkb-hint">🔔 VKB 命中提示音已播放，若游客问题撞知识库，请点「OK」让答案反向翻译播放。</div>
+  </div>
+
+  <!-- 状态 -->
+  <div class="card">
+    <div class="status-row">
+      <div class="status-item"><div class="k">连接</div><div class="v" id="st-conn">未连接</div></div>
+      <div class="status-item"><div class="k">游客语言 visitor_language</div><div class="v" id="st-lang">UNKNOWN</div></div>
+      <div class="status-item"><div class="k">语言状态</div><div class="v" id="st-state">—</div></div>
+      <div class="status-item"><div class="k">当前 turn</div><div class="v" id="st-turn">—</div></div>
+    </div>
+  </div>
+
+  <!-- 日志 -->
+  <div class="card">
+    <div class="log" id="log"></div>
+  </div>
+</div>
+
+<script>
+  // ===== 全局状态 =====
+  var ws = null;
+  var sessionId = null;
+  var connected = false;
+  var role = 'counterparty';   // 0=wearer 1=counterparty
+  var sessionStartTs = 0;
+
+  // 音频采集状态
+  var audioCtx = null;
+  var processor = null;
+  var micStream = null;
+  var recording = false;
+  var currentTurnId = null;
+  var currentSequence = 0;
+  var pendingPcm = [];       // 累积未发送的 Int16 样本
+  var talkStartMs = 0;
+
+  // TTS 播放累积
+  var ttsChunks = [];        // 剥头后的 Int16 PCM 字节
+  var currentTtsTurn = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+  var logEl = $('log');
+
+  function log(msg, cls) {
+    var line = document.createElement('div');
+    line.className = cls || '';
+    line.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+    logEl.appendChild(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function uuid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
+  // ===== 连接 =====
+  function connect() {
+    var host = $('host').value.trim();
+    var deviceId = $('deviceId').value.trim();
+    var token = $('token').value.trim();
+    var url = 'ws://' + host + '/ws?device_id=' + encodeURIComponent(deviceId) + '&token=' + encodeURIComponent(token);
+    log('连接 ' + url, 'sys');
+    ws = new WebSocket(url);
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = function () {
+      connected = true;
+      $('st-conn').textContent = '已连接';
+      $('btn-connect').disabled = true;
+      $('btn-disconnect').disabled = false;
+      sessionId = uuid();
+      sessionStartTs = Date.now();
+      sendSessionInit();
+      log('已连接，session_id=' + sessionId, 'sys');
+    };
+    ws.onmessage = function (ev) { handleMessage(ev); };
+    ws.onclose = function () {
+      connected = false;
+      $('st-conn').textContent = '已断开';
+      $('btn-connect').disabled = false;
+      $('btn-disconnect').disabled = true;
+      log('连接已断开', 'sys');
+    };
+    ws.onerror = function () { log('WebSocket 错误', 'err'); };
+  }
+
+  function disconnect() {
+    if (ws) ws.close();
+  }
+
+  function sendJson(obj) {
+    if (ws && ws.readyState === 1) {
+      var s = JSON.stringify(obj);
+      ws.send(s);
+      log('↑ ' + s, 'out');
+    }
+  }
+
+  function sendSessionInit() {
+    sendJson({
+      type: 'session_init',
+      session_id: sessionId,
+      scope: $('scope').value,
+      staff_language: 'ja-JP',
+      translation_mode: $('mode').value,
+      lang_pair: $('langPair').value,
+      headset_state: 'disconnected',
+      input_source: 'badge_far',
+      wifi_band: '5GHz',
+      network_state: 'good',
+      config_version: 1
+    });
+  }
+
+  function onModeChange() {
+    // 切换翻译模式：云端会清 visitor_language（协议 §1.4）
+    if (connected) {
+      sendJson({
+        type: 'translation_mode_change',
+        session_id: sessionId,
+        translation_mode: $('mode').value,
+        lang_pair: $('langPair').value
+      });
+      $('st-lang').textContent = 'UNKNOWN';
+      $('st-state').textContent = 'unknown';
+    }
+  }
+
+  // ===== 角色切换 =====
+  function setRole(r) {
+    role = r;
+    $('role-counterparty').classList.toggle('active', r === 'counterparty');
+    $('role-wearer').classList.toggle('active', r === 'wearer');
+    log('当前说话人 → ' + (r === 'counterparty' ? '游客(1)' : '员工(0)'), 'sys');
+  }
+
+  // ===== 音频采集 =====
+  function ensureAudio() {
+    if (audioCtx) return Promise.resolve();
+    return navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } })
+      .then(function (stream) {
+        micStream = stream;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        var source = audioCtx.createMediaStreamSource(stream);
+        processor = audioCtx.createScriptProcessor(4096, 1, 1);
+        processor.onaudioprocess = onAudioProcess;
+        source.connect(processor);
+        processor.connect(audioCtx.destination); // 不连也可，但 ScriptProcessor 需要连接到 destination 才会触发
+        log('麦克风已就绪，采样率 ' + audioCtx.sampleRate + 'Hz → 重采样到 16kHz', 'sys');
+      })
+      .catch(function (e) {
+        log('麦克风获取失败：' + e.message + '（需 https 或 localhost）', 'err');
+        throw e;
+      });
+  }
+
+  function onAudioProcess(ev) {
+    if (!recording) return;
+    var input = ev.inputBuffer.getChannelData(0);
+    var float16 = resample(input, audioCtx.sampleRate, 16000);
+    var int16 = toInt16(float16);
+    for (var i = 0; i < int16.length; i++) pendingPcm.push(int16[i]);
+    // 每 100ms（1600 样本）切一个分片发送
+    while (pendingPcm.length >= 1600) {
+      var chunk = pendingPcm.splice(0, 1600);
+      sendAudioChunk(int16ToBytes(chunk));
+    }
+  }
+
+  function resample(input, inRate, outRate) {
+    var ratio = inRate / outRate;
+    var outLen = Math.floor(input.length / ratio);
+    var out = new Float32Array(outLen);
+    for (var i = 0; i < outLen; i++) {
+      var pos = i * ratio;
+      var idx = Math.floor(pos);
+      var frac = pos - idx;
+      var a = input[idx];
+      var b = input[Math.min(idx + 1, input.length - 1)];
+      out[i] = a + (b - a) * frac;
+    }
+    return out;
+  }
+
+  function toInt16(float32) {
+    var int16 = new Int16Array(float32.length);
+    for (var i = 0; i < float32.length; i++) {
+      var s = Math.max(-1, Math.min(1, float32[i]));
+      int16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return int16;
+  }
+
+  function int16ToBytes(int16) {
+    var bytes = new Uint8Array(int16.length * 2);
+    for (var i = 0; i < int16.length; i++) {
+      bytes[i * 2] = int16[i] & 0xff;
+      bytes[i * 2 + 1] = (int16[i] >> 8) & 0xff;
+    }
+    return bytes;
+  }
+
+  // ===== 上行音频帧编码（0x01，大端）=====
+  function sendAudioChunk(audioBytes) {
+    if (!ws || ws.readyState !== 1) return;
+    var turnIdBytes = new TextEncoder().encode(currentTurnId);
+    var buf = new ArrayBuffer(1 + 1 + turnIdBytes.length + 4 + 8 + 1 + 1 + audioBytes.length);
+    var view = new DataView(buf);
+    var off = 0;
+    view.setUint8(off++, 0x01);                 // frame_type
+    view.setUint8(off++, turnIdBytes.length);    // turn_id_len
+    for (var i = 0; i < turnIdBytes.length; i++) view.setUint8(off++, turnIdBytes[i]);
+    view.setUint32(off, currentSequence++, false); // sequence 大端
+    view.setBigUint64(off, BigInt(Date.now() - sessionStartTs), false); off += 8; // timestamp 大端
+    view.setUint8(off++, role === 'wearer' ? 0 : 1); // source_side
+    view.setUint8(off++, 1);                     // input_source=badge_far
+    new Uint8Array(buf, off).set(audioBytes);
+    ws.send(buf);
+  }
+
+  // ===== PTT =====
+  function startTalking() {
+    if (!connected) { log('请先连接', 'err'); return; }
+    ensureAudio().then(function () {
+      recording = true;
+      currentTurnId = uuid();
+      currentSequence = 0;
+      pendingPcm = [];
+      talkStartMs = Date.now();
+      $('ptt').classList.add('recording');
+      $('ptt').textContent = '说话中…（松开发送）';
+      $('st-turn').textContent = currentTurnId.slice(0, 8);
+      log('开始说话 turn=' + currentTurnId.slice(0, 8) + ' role=' + (role === 'wearer' ? '员工' : '游客'), 'in');
+    }).catch(function () {});
+  }
+
+  function stopTalking() {
+    if (!recording) return;
+    recording = false;
+    $('ptt').classList.remove('recording');
+    $('ptt').textContent = '按住说话（松开即发送）';
+    // 发送残留音频 + eou
+    if (pendingPcm.length > 0) {
+      sendAudioChunk(int16ToBytes(pendingPcm));
+      pendingPcm = [];
+    }
+    sendJson({
+      type: 'eou',
+      session_id: sessionId,
+      turn_id: currentTurnId,
+      source_side: role,
+      last_sequence: currentSequence,
+      utterance_duration_ms: Date.now() - talkStartMs,
+      input_source: 'badge_far'
+    });
+    log('结束说话（eou）', 'in');
+  }
+
+  // ===== 下行消息处理 =====
+  function handleMessage(ev) {
+    if (typeof ev.data === 'string') {
+      var msg = JSON.parse(ev.data);
+      log('↓ ' + ev.data, 'in');
+      handleJson(msg);
+    } else {
+      handleBinary(ev.data);
+    }
+  }
+
+  function handleJson(msg) {
+    switch (msg.type) {
+      case 'tts_end':
+        log('tts_end → 开始播放（' + (ttsChunks.length * 2) + ' 字节 PCM）', 'in');
+        playTts(ttsChunks);
+        ttsChunks = [];
+        break;
+      case 'language_state':
+        $('st-lang').textContent = msg.visitor_language || 'UNKNOWN';
+        $('st-state').textContent = msg.state || '—';
+        break;
+      case 'error':
+        log('错误 code=' + msg.code + ' message=' + (msg.message || ''), 'err');
+        ttsChunks = [];
+        break;
+      case 'answer':
+        log('知识库答案：' + (msg.text || ''), 'sys');
+        break;
+      default:
+        break;
+    }
+  }
+
+  function handleBinary(data) {
+    var view = new DataView(data);
+    var frameType = view.getUint8(0);
+    if (frameType === 0x81) {
+      // 下行 TTS 帧：frame_type(1) + turn_id_len(1) + turn_id(N) + tts_audio(...)
+      var turnIdLen = view.getUint8(1);
+      var turnIdBytes = new Uint8Array(data, 2, turnIdLen);
+      var turnId = new TextDecoder().decode(turnIdBytes);
+      var audio = new Uint8Array(data, 2 + turnIdLen);
+      log('↓ TTS 帧 turn=' + turnId.slice(0, 8) + ' ' + audio.length + ' 字节', 'in');
+      var pcm = stripWavHeader(audio);
+      ttsChunks.push(pcm);
+      $('vkb-hint').style.display = 'block'; // 收到 beep 时提示可能撞 VKB
+    } else {
+      log('未知二进制帧 frame_type=0x' + frameType.toString(16), 'err');
+    }
+  }
+
+  function stripWavHeader(bytes) {
+    // 若带 RIFF/WAVE 头（44 字节），剥掉；否则原样返回
+    if (bytes.length > 44 &&
+        bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+      return bytes.slice(44);
+    }
+    return bytes;
+  }
+
+  function playTts(pcmChunks) {
+    if (!audioCtx) return;
+    var total = 0;
+    pcmChunks.forEach(function (c) { total += c.length; });
+    if (total === 0) return;
+    var merged = new Uint8Array(total);
+    var off = 0;
+    pcmChunks.forEach(function (c) { merged.set(c, off); off += c.length; });
+
+    var int16 = new Int16Array(merged.buffer);
+    var float32 = new Float32Array(int16.length);
+    for (var i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768;
+    var buffer = audioCtx.createBuffer(1, float32.length, 16000);
+    buffer.getChannelData(0).set(float32);
+    var src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(audioCtx.destination);
+    src.start();
+    log('播放完成 ' + (float32.length / 16000).toFixed(2) + ' 秒', 'sys');
+  }
+
+  // ===== 控制 =====
+  function sendOk() {
+    if (!connected) return;
+    sendJson({ type: 'button_event', session_id: sessionId, button: 'ok' });
+    $('vkb-hint').style.display = 'none';
+  }
+
+  function sendStopTts() {
+    if (!connected || !currentTurnId) return;
+    sendJson({ type: 'stop_tts', session_id: sessionId, turn_id: currentTurnId, reason: 'button' });
+    ttsChunks = [];
+  }
+</script>
+</body>
+</html>
