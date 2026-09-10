@@ -19,6 +19,11 @@ public class WelcomeController {
 
     @GetMapping("/")
     public String index() {
-        return "sim".equals(role) ? "redirect:/simulator.html" : "redirect:/index.html";
+        // 用 forward 而非 redirect：避免反向代理下 302 生成错误的 scheme/host/端口
+        return switch (role) {
+            case "sim" -> "forward:/simulator.html";
+            case "gateway" -> "forward:/gateway.html";
+            default -> "forward:/index.html";
+        };
     }
 }
