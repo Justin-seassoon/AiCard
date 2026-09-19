@@ -1,0 +1,18 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>AI 工牌 1.0 · 服务端周报</title><style>
+@page { size: A4; margin: 2.2cm 2.4cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.65; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', 'Microsoft YaHei', sans-serif;
+       font-size: 18pt; font-weight: 700; text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 16pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+ul { margin: 2pt 0 4pt; padding-left: 0; list-style: none; }
+ul li { margin: 0 0 5pt; padding-left: 12pt; text-indent: -12pt; }
+ul li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+span.pre { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 4pt 0 12pt; font-size: 9.8pt; }
+th, td { border: 1px solid #b9c4d4; padding: 5pt 7pt; vertical-align: middle; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+</style></head><body><div class='doctitle'>AI 工牌 1.0 · 服务端周报</div><div class='subtitle'>2026-09-12 三方例会 · 会后更新</div><h2>一、会议决策（端侧硬件，本次例会已定）</h2><ul><li><span class='pre'>按键唤醒（砍 KWS）：</span>第一版不做语音唤醒词，规避内存占用 / 多语言定制 / 浅休眠功耗；砍掉后约 100K DSP 内存缺口闭环，内存已满足当前需求。</li><li><span class='pre'>配网 AP 模式：</span>日本苹果手机用户超 8 成、DPP 仅支持安卓，统一采用 AP 模式配网。</li><li><span class='pre'>耳麦接入待定：</span>8201 不支持 USB 耳麦协议、需额外 Host 转接，内部专项讨论接入方案 + P4 功耗影响。</li><li><span class='pre'>回声消除由端侧做：</span>已确认回声消除由端侧负责（数据回 8201 处理），云端不承担。</li></ul><h2>二、云端本周进展</h2><ul><li><span class='pre'>翻译主链路时延：</span>翻译主链路及 ASR 识别时延基本控制在 2 秒以内。</li><li><span class='pre'>Embedding 与模型：</span>Embedding 切换为亚马逊（原 Azure OpenAI text-embedding-3-small）；测试期使用 DeepSeek 以降成本。</li><li><span class='pre'>知识库：</span>员工 / 游客知识库上线，本周 +15 条、共 354 条，支持自动语种确认与翻译质量控制。</li><li><span class='pre'>旁路采集：</span>旁路数据采集脱敏落库完成，为知识库迭代及与客户内部系统打通提供数据支持。</li><li><span class='pre'>部署状态：</span>已增加 HTTPS，部署外网 IP 与域名；端侧参数已冻结，真机到位即可联调。</li></ul><h2>三、遗留问题 / 风险</h2><ul><li><span class='pre'>耳麦接入方案待定：</span>USB 协议不支持 / 需 Host 转接 + P4 功耗影响，内部专项讨论。</li><li><span class='pre'>时延口径：</span>纪要「2 秒以内」 vs PRD 目标 &lt;1.5s，需澄清是端到端还是云端处理。</li><li><span class='pre'>语言漂移 + 品牌词表白名单：</span>测试用例设计与后台静态配置待下周完成。</li></ul><h2>四、下周规划</h2><ul><li><span class='pre'>语言漂移 + 品牌词表白名单测试：</span>重点针对语言偏移漂移及品牌词表白名单做测试用例设计与测试。</li><li><span class='pre'>后台静态配置：</span>开放品牌词表和白名单的后台静态配置功能。</li><li><span class='pre'>OTA 配置服务：</span>复用现有芯片方案搭建 OTA 配置服务，或提供内网 VPN 供端侧团队自建。</li><li><span class='pre'>多行业场景预研：</span>便利店 / 酒店基础上，预研工地管理、建群管理等更多行业场景。</li></ul><h2>五、待办事项</h2><table><thead><tr><th>负责人</th><th>待办事项</th></tr></thead><tbody><tr><td>TT（端侧）</td><td>DSP 内存具体占用数值 + 语音唤醒词内存占用量化数据</td></tr><tr><td>TT（端侧）</td><td>耳麦接入 8201 具体方案 + P4 芯片功耗影响</td></tr><tr><td>TT（端侧）</td><td>8201 芯片与麦克风接口的具体规格</td></tr><tr><td>蒋旭（产品）</td><td>UI 需求动机初步意见（周一下班前）</td></tr><tr><td>小陈（测试）</td><td>模拟器测试游客知识库与员工知识库功能</td></tr><tr><td>云侧</td><td>语言偏移漂移 + 品牌词表白名单测试用例设计与测试</td></tr><tr><td>云侧</td><td>开放品牌词表和白名单的后台静态配置功能</td></tr><tr><td>云侧</td><td>搭建 OTA 配置服务 / 提供内网 VPN</td></tr><tr><td>云侧</td><td>行业场景方向建议</td></tr></tbody></table></body></html>

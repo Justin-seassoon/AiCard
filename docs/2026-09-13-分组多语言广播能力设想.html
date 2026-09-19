@@ -1,0 +1,18 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>AI 工牌 1.0 · 分组多语言广播能力设想</title><style>
+@page { size: A4; margin: 2.2cm 2.4cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.65; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', 'Microsoft YaHei', sans-serif;
+       font-size: 18pt; font-weight: 700; text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 16pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+ul { margin: 2pt 0 4pt; padding-left: 0; list-style: none; }
+ul li { margin: 0 0 5pt; padding-left: 12pt; text-indent: -12pt; }
+ul li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+span.pre { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 4pt 0 12pt; font-size: 9.8pt; }
+th, td { border: 1px solid #b9c4d4; padding: 5pt 7pt; vertical-align: middle; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+</style></head><body><div class='doctitle'>AI 工牌 1.0 · 分组多语言广播能力设想</div><div class='subtitle'>通用云端能力 + 行业示例 · 2026-09-13 · 纸面预研（暂不涉及代码）</div><h2>一、定位：从「建群管理」到「通用广播能力」</h2><ul><li>原需求「建群管理」（工地多国劳工建群广播）抽掉行业外壳，本质是「分组多语言广播」。</li><li>四个要素——分组、广播、语言路由、回执——无一绑定「建筑」，天然是通用中台能力。</li><li>定位为与「一对一对话」并列的第二产品支柱，而非某个行业的竖井功能。</li></ul><h2>二、四个核心要素</h2><ul><li><span class='pre'>分组 Group：</span>一组设备的集合，可嵌套（工地 → 班组）。</li><li><span class='pre'>广播 Broadcast：</span>一条源消息 → 按成员语言分别翻译 → 批量下发。</li><li><span class='pre'>语言路由：</span>每台设备一个目标语言（复用一机一码已登记的默认语言对）。</li><li><span class='pre'>回执 Ack：</span>成员确认状态回流 + 汇总看板。</li></ul><h2>三、可复用行业（举例）</h2><ul><li>工厂 / 制造业：多语种产线工人的安全通知、班次调度。</li><li>酒店 / 服务业：多语种员工班前会、VIP 到店、突发事件广播。</li><li>机场 / 交通枢纽：多语种地勤 / 安保的航班变更、紧急广播。</li><li>展会 / 大型活动：多语种工作人员现场统一调度。</li><li>医院 / 护理：多语种护工医嘱传达、紧急呼叫。</li><li>物流 / 仓储：多语种工人任务分配。</li><li>共同点：任何「有多语种成员、需统一触达 + 回收确认」的团队场景。</li></ul><h2>四、与「一对一对话」的关系</h2><ul><li>一对一对话 = 个人沟通（店员 ↔ 游客）；分组广播 = 组织沟通（管理员 → 全员）。</li><li>两者是并列的两个支柱、不是从属；云端应做成并列的通用服务。</li></ul><h2>五、对云端的新增要求（通用能力）</h2><ul><li><span class='pre'>分组管理：</span>group 实体 + 可嵌套 + 成员关系（复用四层租户隔离，加 group_id）。</li><li><span class='pre'>广播编排：</span>源消息 → N 翻译 → N TTS → N 推送（复用 MT / TTS 供应商抽象）。</li><li><span class='pre'>下行推送通道：</span>云端主动下行（现有是设备按需短连接），最大架构差异点。</li><li><span class='pre'>确认回执：</span>ack 上报 + 汇总看板。</li><li><span class='pre'>后台 UI：</span>分组管理 + 广播记录 + 回执看板（复用 RBAC）。</li><li><span class='pre'>行业模板：</span>工地 / 酒店等差异做成配置 / 模板，不做每行业一个功能。</li></ul><h2>六、与现有架构的复用与差异</h2><ul><li>关键复用：一机一码已登记每设备的「默认语言对」＝ 广播所需的「成员语言画像」，无需新发明语言归属。</li><li>复用：设备鉴权、MT / TTS 多供应商抽象、四层租户隔离、RBAC、旁路采集。</li><li>差异（见下表）：</li></ul><table><thead><tr><th>维度</th><th>现有：一对一对话</th><th>新增：分组广播</th></tr></thead><tbody><tr><td>会话模型</td><td>设备按需建立会话级短连接</td><td>云端主动下行推送（需常连接 / 推送机制）</td></tr><tr><td>翻译方向</td><td>对话双向轮流</td><td>单向一对多（源 → N 母语）</td></tr><tr><td>触发方式</td><td>按键触发</td><td>管理员后台触发</td></tr><tr><td>消息形态</td><td>语音对话（不显示文本）</td><td>文本 + 语音播报 + 墨水屏显示</td></tr><tr><td>回执</td><td>无</td><td>按键确认回执</td></tr></tbody></table><h2>七、需预研讨论的问题</h2><ul><li>下行通道选型与功耗：WSS 常连接 / MQTT / 端侧轮询？对「7–10 天待机」的影响。</li><li>消息形态：文本优先还是语音？工地噪声对 TTS 播报可靠性的影响；墨水屏是否够显示。</li><li>确认粒度：整条确认，还是带选项（收到 / 有疑问）？</li><li>群规模与成本：单群工牌数上限？批量翻译 + TTS 的成本模型。</li><li>权限：谁能发广播（管理员 / 班组长）？</li><li>模式切换：工牌上如何区分「群广播」与「对话翻译」？</li><li>离线补发：设备错过广播怎么办（重连补发 / 去重）？</li><li>行业模板抽象粒度：哪些字段可变、哪些固定，避免做成每行业一套。</li></ul></body></html>

@@ -1,0 +1,19 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>AI 工牌 · 周会汇报</title><style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.6; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 18pt; font-weight: 700;
+       text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 14pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+h3 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 11pt; font-weight: 700;
+       color: #1a3c6e; margin: 10pt 0 3pt; }
+li { margin: 0 0 4pt; padding-left: 12pt; text-indent: -12pt; }
+li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+span.pre { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 5pt 0 10pt; font-size: 9pt; }
+th, td { border: 1px solid #b9c4d4; padding: 4pt 7pt; vertical-align: top; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+</style></head><body><div class='doctitle'>AI 工牌 · 周会汇报</div><div class='subtitle'>本周工作总结与下周工作计划 · 2026-09-16</div><h2>一、本周工作总结</h2><h3>1. 分组多语言广播 · 全链路闭环</h3><li><span class='pre'>：</span>从「建群管理」泛化为「分组多语言广播」能力（第二支柱），实现 + 部署 + 端到端验证。</li><li><span class='pre'>：</span>接口规范 v5 补广播协议（broadcast 下行 + broadcast_ack 回执 + 补拉时序）；业务测试指南 + 模拟器广播 UI。</li><li><span class='pre'>：</span>排查修复 TTS 乱序杂音（根因：Azure 合成返回 6 个 WAV 拼接 + 连发打断咔哒，均已解决）。</li><h3>2. 质量门控</h3><li><span class='pre'>：</span>语言漂移 + 品牌词表白名单专项测试（6 个测试 + 测试用例文档）。</li><li><span class='pre'>：</span>品牌词表白名单后台可配 + 动态生效（V10 迁移 + 缓存服务 + 后台 API）。</li><h3>3. 基础设施</h3><li><span class='pre'>：</span>pg 连接泄漏排查（部署反复重启导致）+ HikariCP 连接池配置修复。</li><h3>4. 产品定位对齐（本周最重要转向）</h3><li><span class='pre'>：</span>明确产品 = 一线员工的 AI agent 助手（公司 AI 化经营末梢），翻译只是入口。</li><li><span class='pre'>：</span>核心价值四维度：前线数据采集 / 知识库远程支持 / 销售推荐 / 团队管理。</li><li><span class='pre'>：</span>补充「业务知识闭环自我迭代」+「数据驱动经营」。</li><h3>5. 演示准备</h3><li><span class='pre'>：</span>演示控制台（demo.html）：一键切换行业 + 起承转合+生演示脚本 + 后台看板 + agent 能力展示。</li><li><span class='pre'>：</span>补齐机场、工地知识库（SKB + VKB，专业度对齐酒店免税店标准）。</li><li><span class='pre'>：</span>销售培训手册（功能介绍 + 话术 + 常见问题）。</li><h3>6. 端侧对接</h3><li><span class='pre'>：</span>答复「连接生命周期 vs 广播实时性」矛盾，对齐为「准实时 + 离线补拉」，协议 §5.5 修订。</li><h2>二、下周工作计划</h2><table><thead><tr><th>事项</th><th>说明</th></tr></thead><tbody><tr><td>劳工派遣行业拓展（新增重点）</td><td>日本外国劳工占比大、培训管理重；工牌价值契合（翻译 / 培训知识库 / 调度通知 / 考勤考评），涵盖制造业、餐饮、农业、介护、清扫等</td></tr><tr><td>配合端侧真机联调</td><td>翻译 + 广播 + 知识库全链路，等端侧真机到位</td></tr><tr><td>机场工地知识库审校</td><td>日语表述、专业度，请懂行的人复核</td></tr><tr><td>演示物料迭代</td><td>销售培训反馈后调整话术 / 场景</td></tr><tr><td>产品愿景细化</td><td>主动性 / 执行性（纸面，不写代码），完善 agent 故事</td></tr><tr><td>广播端侧固件对接</td><td>配合 ODM 实现 broadcast 接收 + 回执</td></tr></tbody></table><h2>三、周会上需对齐的点</h2><li><span class='pre'>广播实时性：</span>结论「准实时 + 离线补拉」需端侧确认接受「离线不保证实时到达」。</li><li><span class='pre'>演示依赖真机：</span>真机出来前，演示先用模拟器兜底。</li><li><span class='pre'>知识库审校：</span>机场工地知识库日语专业度需甲方 / 懂行的人复核。</li><li><span class='pre'>劳工派遣行业：</span>建议下周先做行业调研（细分场景、知识库框架），对齐后再补知识库。</li></body></html>

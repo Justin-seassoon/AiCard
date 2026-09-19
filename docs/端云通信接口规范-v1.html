@@ -1,0 +1,439 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>端云通信接口规范 v5</title><style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10pt;
+       line-height: 1.6; color: #1a1a1a; margin: 0; }
+h1 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 19pt; text-align: center;
+     margin: 0 0 6pt; color: #111; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13.5pt; font-weight: 700;
+     color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 8pt;
+     page-break-after: avoid; }
+h3 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 11.5pt; font-weight: 700;
+     color: #1a3c6e; margin: 12pt 0 5pt; page-break-after: avoid; }
+p { margin: 3pt 0; }
+ul, ol { margin: 3pt 0 5pt; padding-left: 1.4em; }
+li { margin: 2pt 0; }
+blockquote { margin: 4pt 0; padding: 4pt 10pt; border-left: 3px solid #b9c4d4;
+     color: #555; background: #f6f8fb; }
+blockquote p { margin: 0; }
+hr { border: none; border-top: 1px solid #d0d7e2; margin: 12pt 0; }
+table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt; font-size: 9pt;
+     page-break-inside: avoid; }
+th, td { border: 1px solid #b9c4d4; padding: 4pt 7pt; vertical-align: top; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+pre { background: #f4f6f9; border: 1px solid #e0e5ec; border-radius: 4px;
+      padding: 8pt 10pt; margin: 6pt 0; font-size: 8.5pt; line-height: 1.45;
+      white-space: pre-wrap; word-wrap: break-word; }
+code { font-family: 'Menlo', 'SF Mono', monospace; font-size: 8.5pt; background: #f0f2f5;
+       padding: 0 3px; border-radius: 2px; }
+pre code { background: none; padding: 0; }
+strong { font-weight: 700; }
+</style></head><body><h1>AI 工牌 1.0 端云通信接口规范 · v4</h1>
+<ul>
+<li><strong>状态</strong>：已定稿；协议参数已冻结（ODM 已确认）。</li>
+<li><strong>v5 修订</strong>：新增「分组多语言广播」（§3.3 ⑪ <code>broadcast_ack</code> 回执、§4.2 ⑧ <code>broadcast</code> 下行、§5.5 广播时序）。</li>
+<li><strong>v4 修订</strong>：写死键→状态迁移表（补 staff_qa 内问答键行为、退出问答返回进入前状态）、scope_change 竞态收口、fixed 模式显示与 reset 回执、query_scope 派生、staff_qa 状态机约束、命名统一。</li>
+<li><strong>权威来源</strong>：《AI工牌1.0产品需求文档（0804）》§6.4/§9.3/§10、《软件端顶层架构总纲》§4/§6/§10。</li>
+<li><strong>适用对象</strong>：ODM 端侧固件（ESP32-P4 + C5 + IA8201）与甲方云端后端联调。</li>
+<li><strong>传输</strong>：全双工 WebSocket（WSS）。<strong>音频走二进制帧，控制消息走 JSON 文本帧。</strong></li>
+</ul>
+<hr>
+<h2>1. 连接与鉴权</h2>
+<h3>1.1 连接方式</h3>
+<ul>
+<li><strong>协议</strong>：WebSocket over TLS（<code>wss://</code>）。</li>
+<li><strong>建连时机</strong>：短按翻译键触发 → 建连（scope=translate）；<strong>无活跃会话时</strong>短按问答键触发 → 建连（scope=staff_qa）。会话结束（再次短按翻译键 / 空闲超时）→ 断开。<strong>会话级短连，不维持长连接</strong>。</li>
+<li><strong>端点</strong>：<code>wss://&lt;host&gt;/ws?device_id=&lt;id&gt;&amp;token=&lt;t&gt;&amp;fw_version=&lt;v&gt;&amp;proto_ver=1</code></li>
+<li><code>proto_ver</code>：协议版本（当前 <code>1</code>），帧结构演进协商用。</li>
+</ul>
+<h3>1.2 握手鉴权</h3>
+<table><thead><tr><th>参数</th><th>类型</th><th>说明</th></tr></thead><tbody>
+<tr><td><code>device_id</code></td><td>string</td><td>设备唯一标识，云端签发</td></tr>
+<tr><td><code>token</code></td><td>string</td><td>设备短期凭证（demo 静态；真实上线短期轮换）</td></tr>
+<tr><td><code>fw_version</code></td><td>string</td><td>端侧主固件版本（P4）</td></tr>
+<tr><td><code>proto_ver</code></td><td>int</td><td>协议版本</td></tr>
+</tbody></table>
+<ul>
+<li>握手云端用 <code>device_id + token</code> 鉴权，失败拒绝握手（HTTP 403）。</li>
+<li>鉴权成功云端由设备身份推导 <code>customer_id</code>/<code>store_id</code>；会话内消息不再带 token、不接受租户字段。</li>
+<li>⚠️ token 过期：真实上线建议「断开重连重新握手」，demo 静态 token 不处理。</li>
+</ul>
+<h3>1.3 session_id 与 turn_id</h3>
+<ul>
+<li><code>session_id</code>：一次<strong>翻译会话</strong>的唯一标识，设备生成（UUID），会话内所有消息带同一值。<strong>断线重连必须生成新 session_id</strong>。</li>
+<li><code>turn_id</code>：会话内一轮对话（一句话）的唯一标识，<strong>设备生成（UUID）</strong>，随新 utterance 更换。</li>
+<li>规则：<strong>同一 turn 内</strong>，音频分片、对应 TTS、对应 <code>stop_tts</code> 使用同一 turn_id；打断后新 turn 换新 turn_id，<code>stop_tts</code> 指向被停的旧 turn_id。<code>sequence</code> 仅在 turn 内从 0 递增，不跨 turn 复用。</li>
+</ul>
+<h3>1.4 会话业务域 scope 与语言对模式 translation_mode（v3 核心）</h3>
+<p>两个<strong>独立</strong>概念，勿混：</p>
+<table><thead><tr><th>概念</th><th>取值</th><th>切换消息</th><th>是否清 visitor_language</th></tr></thead><tbody>
+<tr><td><code>scope</code>（会话业务域）</td><td><code>translate</code> / <code>staff_qa</code></td><td><code>scope_change</code>（会话内）</td><td><strong>不清</strong>（PRD §9.3 员工问答不清空）</td></tr>
+<tr><td><code>translation_mode</code>（语言对模式）</td><td><code>auto</code> / <code>fixed</code></td><td><code>translation_mode_change</code></td><td><strong>清</strong>（PRD §6.4.10 模式切换重置）</td></tr>
+</tbody></table>
+<p><strong>query_scope 由 scope 派生</strong>：<code>translate → customer</code>、<code>staff_qa → staff</code>。端侧<strong>只传 scope</strong>，云端从 scope 派生 query_scope（不信任端侧传的 query_scope，冲突以 scope 为准）。</p>
+<p><strong>键 → 状态迁移表（写死，ODM 照此实现）</strong>：</p>
+<table><thead><tr><th>当前状态</th><th>按键</th><th>动作</th></tr></thead><tbody>
+<tr><td>待机（无会话）</td><td>短按翻译键</td><td>建连，scope=translate</td></tr>
+<tr><td>待机（无会话）</td><td>短按问答键</td><td>建连，scope=staff_qa</td></tr>
+<tr><td>translate 会话中</td><td>短按问答键</td><td><code>scope_change</code> → staff_qa（保留 visitor_language）</td></tr>
+<tr><td>staff_qa 会话中</td><td>短按翻译键</td><td><code>scope_change</code> → <strong>返回进入前状态</strong>（从 translate 进→回 translate；从待机直进→结束会话回待机），保留 visitor_language</td></tr>
+<tr><td>staff_qa 等待中</td><td>短按问答键</td><td>取消本轮提问，保持 staff_qa（可继续提问）</td></tr>
+<tr><td>staff_qa 播放中</td><td>短按问答键</td><td><code>stop_tts</code> 停止当前答案播放，保持 staff_qa</td></tr>
+<tr><td>translate 会话中</td><td>短按翻译键</td><td>结束会话（断开，清 visitor_language）</td></tr>
+<tr><td>任一状态</td><td>空闲超时</td><td>结束会话（断开，清 visitor_language）</td></tr>
+</tbody></table>
+<p><strong>staff_qa 状态机约束</strong>：</p>
+<ul>
+<li>staff_qa 内<strong>不执行 LID、不建立/更新 visitor_language</strong>（冻结语言记忆）。</li>
+<li>staff_qa 内 <code>translation_mode_change</code> <strong>非法，云端忽略</strong>（SW-SKB-009 员工问答不得修改 translation_mode）。</li>
+</ul>
+<hr>
+<h2>2. 帧结构总览</h2>
+<table><thead><tr><th>帧类型</th><th>方向</th><th>编码</th><th>frame_type</th></tr></thead><tbody>
+<tr><td>音频分片</td><td>端 → 云</td><td><strong>二进制帧</strong></td><td><code>0x01</code></td></tr>
+<tr><td>TTS 音频</td><td>云 → 端</td><td><strong>二进制帧</strong></td><td><code>0x81</code></td></tr>
+<tr><td>控制消息</td><td>双向</td><td><strong>JSON 文本帧</strong>（UTF-8）</td><td>—</td></tr>
+</tbody></table>
+<ul>
+<li><strong>字节序</strong>：帧头多字节整数（sequence/timestamp 等）<strong>大端 big-endian</strong>；音频 PCM 采样值 <strong>小端 little-endian</strong>（与 WAV 一致）。</li>
+<li>frame_type 高 4 位分方向：<code>0x0x</code> 上行、<code>0x8x</code> 下行。</li>
+</ul>
+<h3>2.1 上行音频帧（<code>0x01</code>）</h3>
+<pre><code>
+偏移  长度      字段
+0     1 byte    frame_type = 0x01
+1     1 byte    turn_id_len = N（1~255）
+2     N bytes   turn_id（UTF-8，UUID）
+2+N   4 bytes   sequence（uint32 大端，turn 内从 0 递增）
+6+N   8 bytes   timestamp（uint64 大端，会话内相对毫秒，自建连起）
+14+N  1 byte    source_side：0=wearer 1=counterparty 2=uncertain
+15+N  1 byte    input_source：0=badge_near 1=badge_far 2=headset_mic 3=uncertain
+16+N  剩余       audio_payload（裸 PCM：PCM16 · 16kHz · 单声道 · little-endian，不含 WAV/RIFF 头）
+</code></pre>
+<blockquote><code>input_source</code> 以<strong>帧级为准</strong>（每帧携带）；<code>eou</code>/<code>session_init</code> 的 input_source 为会话/句级参考，与帧级冲突时以帧级为准。</blockquote>
+<h3>2.2 下行 TTS 帧（<code>0x81</code>）</h3>
+<pre><code>
+偏移  长度      字段
+0     1 byte    frame_type = 0x81
+1     1 byte    turn_id_len = N
+2     N bytes   turn_id（UTF-8，UUID）
+2+N   剩余       tts_audio（RIFF/WAV：44 字节 WAV 头 + PCM16 · 16kHz · 单声道 · little-endian，流式分片下发）
+</code></pre>
+<blockquote>流结束由 JSON <code>tts_end</code> 标记，TTS 帧本身不携带结束标记。<strong>0x81 帧只带 turn_id，不带 session_id</strong>（单会话连接内由 turn_id 唯一定位）。</blockquote>
+<h3>2.3 JSON 控制消息</h3>
+<ul>
+<li>文本帧 UTF-8 JSON，以 <code>type</code> 区分；字段 snake_case；未出现字段视为 null/缺省。</li>
+<li><strong>JSON 控制消息统一带 session_id</strong>（0x81 二进制帧例外）。</li>
+</ul>
+<hr>
+<h2>3. 上行消息</h2>
+<h3>3.1 会话初始化 <code>session_init</code>（建连后首条，必发）</h3>
+<pre><code>
+{
+  &quot;type&quot;: &quot;session_init&quot;,
+  &quot;session_id&quot;: &quot;s1&quot;,
+  &quot;scope&quot;: &quot;translate&quot;,
+  &quot;staff_language&quot;: &quot;ja-JP&quot;,
+  &quot;translation_mode&quot;: &quot;auto&quot;,
+  &quot;lang_pair&quot;: &quot;zh-ja&quot;,
+  &quot;headset_state&quot;: &quot;disconnected&quot;,
+  &quot;input_source&quot;: &quot;badge_far&quot;,
+  &quot;wifi_band&quot;: &quot;5GHz&quot;,
+  &quot;network_state&quot;: &quot;good&quot;,
+  &quot;config_version&quot;: 123,
+  &quot;candidates&quot;: [&quot;ja-JP&quot;, &quot;zh-CN&quot;, &quot;en-US&quot;, &quot;ko-KR&quot;]
+}
+</code></pre>
+<table><thead><tr><th>字段</th><th>说明</th></tr></thead><tbody>
+<tr><td><code>scope</code></td><td><code>translate</code> / <code>staff_qa</code>（会话初始业务域）</td></tr>
+<tr><td><code>staff_language</code></td><td>当前员工语言（双向翻译锚点）</td></tr>
+<tr><td><code>translation_mode</code></td><td><code>auto</code> / <code>fixed</code>（翻译语言对模式）</td></tr>
+<tr><td><code>lang_pair</code></td><td><code>fixed</code> 时填写（如 <code>zh-ja</code>）；auto 可空</td></tr>
+<tr><td><code>headset_state</code></td><td><code>disconnected</code> / <code>connected</code> / <code>input_error</code> / <code>output_error</code></td></tr>
+<tr><td><code>input_source</code></td><td>当前主输入通道</td></tr>
+<tr><td><code>wifi_band</code> / <code>network_state</code></td><td>网络状态（运营分析用）</td></tr>
+<tr><td><code>config_version</code></td><td>设备当前配置版本号（pull 比对用）</td></tr>
+<tr><td><code>candidates</code></td><td>当前门店候选语种集</td></tr>
+</tbody></table>
+<blockquote><code>query_scope</code> 由 <code>scope</code> 派生（translate→customer / staff_qa→staff），端侧不传，云端从 scope 推导。</blockquote>
+<h3>3.2 二进制音频帧（<code>0x01</code>）</h3>
+<p>见 §2.1。持续流式上传，每帧一个分片。</p>
+<h3>3.3 JSON 控制消息</h3>
+<p><strong>① 尾包 <code>eou</code></strong> —— 该 turn 的<strong>最后一条</strong>消息，之后才允许开始新 turn：</p>
+<pre><code>
+{&quot;type&quot;:&quot;eou&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;turn_id&quot;:&quot;t1&quot;,&quot;source_side&quot;:&quot;counterparty&quot;,
+ &quot;last_sequence&quot;:23,&quot;utterance_duration_ms&quot;:1500,&quot;input_source&quot;:&quot;badge_far&quot;}
+</code></pre>
+<table><thead><tr><th>字段</th><th>说明</th></tr></thead><tbody>
+<tr><td><code>source_side</code></td><td>该句说话方</td></tr>
+<tr><td><code>last_sequence</code></td><td>该 turn 最后分片 sequence 号（收齐校验）</td></tr>
+<tr><td><code>utterance_duration_ms</code></td><td>有效语音时长（质量门控 min_utt_duration_ms）</td></tr>
+<tr><td><code>input_source</code></td><td>该句实际输入通道（与帧级冲突时帧级为准）</td></tr>
+</tbody></table>
+<p><strong>② 打断上报 <code>stop_tts</code></strong> —— 端侧本地打断后异步上报，turn_id 指向被停的旧 turn：</p>
+<pre><code>
+{&quot;type&quot;:&quot;stop_tts&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;turn_id&quot;:&quot;old_t1&quot;,&quot;reason&quot;:&quot;voice&quot;}
+</code></pre>
+<blockquote><code>reason</code> 枚举：<code>voice</code>（语音抢占）/ <code>button</code>（按键停止）。</blockquote>
+<p><strong>③ 睡眠上报 <code>sleep_notice</code></strong>：</p>
+<pre><code>
+{&quot;type&quot;:&quot;sleep_notice&quot;,&quot;session_id&quot;:&quot;s1&quot;}
+</code></pre>
+<p><strong>④ 按键事件 <code>button_event</code></strong>：</p>
+<pre><code>
+{&quot;type&quot;:&quot;button_event&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;button&quot;:&quot;ok&quot;}
+</code></pre>
+<blockquote><code>button:&quot;ok&quot;</code> 为 VKB（游客知识库）候选确认：游客提问翻译成日语后，云端先撞 VKB，命中则「嘀嘀」提示服务人员，服务人员按 OK 确认后云端把答案反向翻译成游客语言播放；未命中/超时则回退播翻译原文（见 §5.1）。</blockquote>
+<p><strong>⑤ 播放事件 <code>playback_event</code></strong>：</p>
+<pre><code>
+{&quot;type&quot;:&quot;playback_event&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;turn_id&quot;:&quot;t1&quot;,&quot;event&quot;:&quot;completed&quot;}
+</code></pre>
+<blockquote><code>event</code>：<code>started</code> / <code>completed</code>（打断以 <code>stop_tts</code> 为准，不要求发 interrupted）。</blockquote>
+<p><strong>⑥ 业务域切换 <code>scope_change</code></strong> —— 员工进入/退出问答，<strong>会话内、不清 visitor_language</strong>：</p>
+<pre><code>
+{&quot;type&quot;:&quot;scope_change&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;scope&quot;:&quot;staff_qa&quot;}
+</code></pre>
+<blockquote><code>query_scope</code> 由 <code>scope</code> 派生，端侧不传。</blockquote>
+<blockquote>⚠️ in-flight 竞态：翻译 TTS 播放中或处理中切 scope，端侧先本地停播 + 发 <code>stop_tts(旧 turn_id)</code> 再发 <code>scope_change</code>；云端收到 <code>scope_change</code> 后作废当前翻译 turn（不再下发该 turn 的 TTS/tts_end）。</blockquote>
+<p><strong>⑦ 语言对模式切换 <code>translation_mode_change</code></strong> —— AUTO↔固定语言对，<strong>清 visitor_language</strong>：</p>
+<pre><code>
+{&quot;type&quot;:&quot;translation_mode_change&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;translation_mode&quot;:&quot;fixed&quot;,&quot;lang_pair&quot;:&quot;zh-ja&quot;}
+</code></pre>
+<p><strong>⑧ 耳机事件 <code>headset_event</code></strong> —— mid-session 耳机插拔/异常上报：</p>
+<pre><code>
+{&quot;type&quot;:&quot;headset_event&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;headset_state&quot;:&quot;output_error&quot;}
+</code></pre>
+<p><strong>⑨ 配置拉取 <code>config_pull</code></strong>：</p>
+<pre><code>
+{&quot;type&quot;:&quot;config_pull&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;config_version&quot;:123}
+</code></pre>
+<p><strong>⑩ 心跳</strong> —— WS 原生 ping/pong（非应用层），间隔见 §9。</p>
+<p><strong>⑪ 广播回执 <code>broadcast_ack</code></strong> —— 收到广播并确认后上报：</p>
+<pre><code>
+{&quot;type&quot;:&quot;broadcast_ack&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;broadcast_id&quot;:42}
+</code></pre>
+<table><thead><tr><th>字段</th><th>说明</th></tr></thead><tbody>
+<tr><td><code>broadcast_id</code></td><td>广播 ID（广播下行消息里携带，回执据此定位）</td></tr>
+</tbody></table>
+<blockquote>广播播放 / 显示完成后，用户按 OK 键确认，设备上报 <code>broadcast_ack</code>，云端记录回执（后台回执看板）。</blockquote>
+<hr>
+<h2>4. 下行消息</h2>
+<h3>4.1 二进制 TTS 帧（<code>0x81</code>）</h3>
+<p>见 §2.2。流式下发，首帧即播。</p>
+<h3>4.2 JSON 控制消息</h3>
+<p><strong>① TTS 流结束 <code>tts_end</code></strong>：</p>
+<pre><code>
+{&quot;type&quot;:&quot;tts_end&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;turn_id&quot;:&quot;t1&quot;}
+</code></pre>
+<blockquote>⚠️ 打断竞态：端侧<strong>发出</strong> <code>stop_tts</code> 后，云端停发该 turn 后续分片并<strong>不再补发 tts_end</strong>；端侧发出 stop_tts 后忽略迟到的 tts_end（按 turn_id 匹配丢弃）。</blockquote>
+<p><strong>② 错误 <code>error</code></strong>：</p>
+<pre><code>
+{&quot;type&quot;:&quot;error&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;turn_id&quot;:&quot;t1&quot;,&quot;code&quot;:&quot;E_LID_LOW&quot;,&quot;message&quot;:&quot;请再说一遍&quot;,&quot;fallback_action&quot;:&quot;ask_repeat&quot;}
+</code></pre>
+<blockquote><code>turn_id</code> 会话级错误（E_AUTH/E_NET/E_SESSION）可缺省；session_id 必带。</blockquote>
+<p><strong>③ 文本 <code>final_text</code> / <code>partial_text</code></strong> —— ⚠️ 端侧不显示，仅调试/日志：</p>
+<pre><code>
+{&quot;type&quot;:&quot;final_text&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;turn_id&quot;:&quot;t1&quot;,&quot;text&quot;:&quot;你好&quot;}
+</code></pre>
+<p><strong>④ 知识库答案 <code>answer</code></strong> —— 员工知识库（skb）答案，TTS 音频随后用 0x81 帧下发：</p>
+<pre><code>
+{&quot;type&quot;:&quot;answer&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;turn_id&quot;:&quot;t1&quot;,&quot;text&quot;:&quot;早餐时间为 7:00-10:00&quot;,&quot;source_refs&quot;:[&quot;早餐FAQ@v1#42&quot;]}
+</code></pre>
+<p><strong>⑤ 语言状态 <code>language_state</code></strong> —— 合并了 lid_confidence，设备屏幕显示用：</p>
+<pre><code>
+{&quot;type&quot;:&quot;language_state&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;turn_id&quot;:&quot;t1&quot;,&quot;visitor_language&quot;:&quot;zh-CN&quot;,&quot;lid_language&quot;:&quot;zh-CN&quot;,&quot;confidence&quot;:0.92,&quot;state&quot;:&quot;locked&quot;}
+</code></pre>
+<blockquote><code>state</code>：<code>unknown</code> / <code>locked</code> / <code>updating</code> / <code>reset</code> / <code>conflict</code>。</blockquote>
+<blockquote>⚠️ <code>translation_mode=fixed</code> 时：<code>visitor_language</code> 显示为 <code>lang_pair</code> 对端语种（固定，不跑 LID）；<code>translation_mode_change</code> 切换后云端回 <code>language_state(state=reset)</code>，端侧据此刷新屏幕。</blockquote>
+<p><strong>⑥ 配置下发 <code>config_update</code></strong>：</p>
+<pre><code>
+{&quot;type&quot;:&quot;config_update&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;config_version&quot;:124,&quot;config&quot;:{...}}
+</code></pre>
+<p>config 结构见 §7。</p>
+<p><strong>⑦ 输出路由 <code>output_route</code></strong> —— 耳机 P1 后置，字段预留：</p>
+<pre><code>
+{&quot;type&quot;:&quot;output_route&quot;,&quot;session_id&quot;:&quot;s1&quot;,&quot;turn_id&quot;:&quot;t1&quot;,&quot;route&quot;:&quot;speaker&quot;}
+</code></pre>
+<blockquote>耳机路由规则：output_route 必须先于 TTS 首帧到达。</blockquote>
+<p><strong>⑧ 广播 <code>broadcast</code></strong> —— 管理员向群成员下发的一条广播（设备级消息）：</p>
+<pre><code>
+{&quot;type&quot;:&quot;broadcast&quot;,&quot;broadcast_id&quot;:42,&quot;text&quot;:&quot;Thông báo an toàn&quot;,&quot;target_language&quot;:&quot;vi-VN&quot;}
+</code></pre>
+<table><thead><tr><th>字段</th><th>说明</th></tr></thead><tbody>
+<tr><td><code>broadcast_id</code></td><td>广播 ID（回执 <code>broadcast_ack</code> 用）</td></tr>
+<tr><td><code>text</code></td><td>该设备母语的译文（墨水屏显示）</td></tr>
+<tr><td><code>target_language</code></td><td>译文语言</td></tr>
+</tbody></table>
+<blockquote>- 广播是<strong>设备级</strong>消息（管理员 → 全体群成员），不绑定翻译会话，<code>session_id</code> 可缺省。</blockquote>
+<blockquote>- 随后译文 TTS 用 <code>0x81</code> 帧下发，turn_id = <code>&quot;bc&quot;+broadcast_id</code>（如 <code>bc42</code>），以 <code>tts_end</code> 结束。</blockquote>
+<blockquote>- 收到后设备显示译文 + 播放 TTS；用户按 OK 键回执 <code>broadcast_ack</code>。</blockquote>
+<hr>
+<h2>5. 时序</h2>
+<h3>5.1 翻译链路（双向）</h3>
+<pre><code>
+设备 ──(握手鉴权)──► 云端
+设备 ──session_init──► 云端（scope/query_scope/staff_language/translation_mode/候选语种）
+设备 ──0x01 音频分片×N──► 云端（流式，source_side + input_source）
+   （云端对已到达分片流式预识别，eou 仅触发尾包收口与最终翻译）
+设备 ──eou──► 云端（last_sequence 收齐校验）
+云端：说话方判定 → LID → ASR → MT → TTS
+云端 ──0x81 TTS 分片×N──► 设备（首帧即回）
+云端 ──tts_end──► 设备（流结束）
+设备 ──playback_event(completed)──► 云端
+</code></pre>
+<ul>
+<li>员工发言（source_side=wearer）→ 翻译为 visitor_language 外放；游客发言（counterparty）→ LID 判向、翻译为 staff_language。</li>
+<li>固定语言对（translation_mode=fixed）→ 跳过 LID，按 lang_pair 双向翻译。</li>
+</ul>
+<p><strong>VKB 自动应答（scope=translate，auto 模式游客发言）</strong>：</p>
+<p>游客发言翻译成日语后，云端先用日语译文撞 VKB 知识库，再决定播什么：</p>
+<pre><code>
+游客 ──0x01 音频×N──► 云端（auto 一步翻译）
+云端：翻译成日语译文 → 撞 VKB 知识库
+  ├─ 命中：
+  │    云端 ──0x81「嘀嘀」提示音──► 设备（不播翻译原文）
+  │    云端 ──language_state──► 设备
+  │    服务人员按 OK → button_event(button:ok) ──► 云端
+  │    云端：答案反向翻译成游客语言 → 0x81 播放 + tts_end
+  │    或 5s 超时未确认 → 回退播翻译原文(0x81) + tts_end
+  └─ 未命中：
+       云端 ──0x81 翻译原文 + tts_end──► 设备
+</code></pre>
+<ul>
+<li>提示音与答案均走 <code>0x81</code> TTS 通道（耳机输出路由为独立后置项，本阶段不区分耳机/扬声器）。</li>
+<li>命中后翻译原文暂不播，仅发「嘀嘀」提示 + language_state；超时/未命中才回退播原文。</li>
+</ul>
+<h3>5.2 员工知识库问答链路（scope=staff_qa）</h3>
+<pre><code>
+设备 ──scope_change(staff_qa)──► 云端（同一 session，保留 visitor_language）
+设备 ──0x01 音频分片×N──► 云端
+设备 ──eou──► 云端
+云端：ASR(staff_language) → 向量检索 → 受控 RAG → LLM 受限生成 → 校验
+云端 ──answer(JSON: text + source_refs)──► 设备
+云端 ──0x81 TTS 分片×N──► 设备（答案 TTS）
+云端 ──tts_end──► 设备
+设备 ──scope_change(translate) / 短按翻译键退出问答──► 云端
+</code></pre>
+<ul>
+<li>staff_qa 内不执行 LID、不更新 visitor_language；<code>translation_mode_change</code> 忽略。</li>
+</ul>
+<h3>5.3 TTS 打断（端侧本地，≤100ms，不等云端）</h3>
+<pre><code>
+设备播放中：检测到新语音 / 按键
+  ├─ 本地：停播 + 清缓存 + 复位拾音（≤100ms，断网可用）
+  └─ 异步：stop_tts(旧 turn_id) ──► 云端（停合成 + 释放 + 记账，不再补发 tts_end）
+</code></pre>
+<ul>
+<li><strong>严禁以断开 WSS 实现打断</strong>。</li>
+<li>迟到 TTS 分片/tts_end 按 turn_id 丢弃；云端容忍中途停流。</li>
+</ul>
+<h3>5.4 断线重连</h3>
+<ul>
+<li>网络断线 = 会话结束、visitor_language 清空；重连必须生成新 session_id 重新握手，回到 UNKNOWN，设备自动恢复不需重启。</li>
+<li>⚠️ 1.0 不加「会话恢复窗口」，2.0 再评估。</li>
+</ul>
+<h3>5.5 广播链路（管理员 → 群成员，一对多）</h3>
+<p>广播由管理员在后台触发，云端按成员母语去重翻译 + TTS，对在线成员实时推送、离线成员重连后补拉：</p>
+<pre><code>
+管理员 ──REST 发广播（群 + 源文本 + 源语言）──► 云端
+云端：查群成员 → 按 target_language 去重 → 每种语言翻译一次 + TTS 一次
+  ├─ 在线成员：broadcast(JSON) → 0x81 TTS 分片 → tts_end（实时推，标已投递）
+  └─ 离线成员：标「未投递」，重连后补拉
+设备：显示译文 + 播放 TTS → 用户按 OK
+设备 ──broadcast_ack(broadcast_id)──► 云端（回执）
+</code></pre>
+<p><strong>离线补拉</strong>（发广播时设备不在线）：</p>
+<pre><code>
+设备 ──session_init──► 云端
+云端：查该设备未投递广播 → broadcast → 0x81 TTS → tts_end
+</code></pre>
+<ul>
+<li>同语言成员共享同一份译文 + TTS（去重，省翻译 / 合成成本）。</li>
+<li>广播不依赖翻译会话；设备只需在线（有 WSS 连接）即可收。</li>
+<li>补拉时云端按已存译文重新合成 TTS 下发（不落音频存储）。</li>
+</ul>
+<blockquote><strong>连接生命周期与实时性（重要）</strong>：广播<strong>不保证离线实时到达</strong>。</blockquote>
+<blockquote>- 「在线」= 设备当前有 WSS 连接（翻译会话中，或按键唤醒后、会话结束前）；「离线」= 设备无 WSS 连接（待机 / Deep Sleep）。</blockquote>
+<blockquote>- 设备待机时进入 Deep Sleep，<strong>不维持长连接、不维持心跳</strong>（保证 7–10 天待机），故离线设备在广播发生时收不到，标记「未投递」。</blockquote>
+<blockquote>- 离线设备下次唤醒 / 建连（<code>session_init</code>）后，云端补拉未投递的广播。</blockquote>
+<blockquote>- 功耗是硬指标，广播是「通知」非「即时消息」，延迟到「员工下次唤醒」可接受；需秒级实时的紧急场景后续单独设计唤醒机制，不纳入本广播。</blockquote>
+<hr>
+<h2>6. 错误码表</h2>
+<table><thead><tr><th>错误码</th><th>场景</th><th>设备端行为</th></tr></thead><tbody>
+<tr><td><code>E_AUTH</code></td><td>鉴权失败</td><td>提示 + 重新鉴权（建议断开重连）</td></tr>
+<tr><td><code>E_NET</code></td><td>网络断开/超时</td><td>重连；提示音；本地打断仍可用</td></tr>
+<tr><td><code>E_LID_LOW</code></td><td>LID 低置信且非白名单</td><td>播「请再说一遍」；不外放译文</td></tr>
+<tr><td><code>E_PROVIDER</code></td><td>供应商全挂（已降级仍失败）</td><td>播「服务暂不可用，稍后再试」</td></tr>
+<tr><td><code>E_ASR_FAIL</code></td><td>ASR 失败</td><td>提示重试 / 云端切备选</td></tr>
+<tr><td><code>E_QA_NO_MATCH</code></td><td>知识库无匹配</td><td>播「暂无明确说明」兜底</td></tr>
+<tr><td><code>E_QA_OUT_OF_SCOPE</code></td><td>范围外问题</td><td>播兜底话术（可配置）</td></tr>
+<tr><td><code>E_CONFLICT</code></td><td>输入来源/语言冲突、重叠讲话</td><td>提示「请依次说话/重新说」；不播放</td></tr>
+<tr><td><code>E_SAME_LANG</code></td><td>双方同语言、游客说 staff_language</td><td>不翻译 / 直通 / 提示重说</td></tr>
+<tr><td><code>E_SESSION</code></td><td>会话被云端强制终止</td><td>结束当前会话，回待机</td></tr>
+</tbody></table>
+<hr>
+<h2>7. 配置下发（config_update）</h2>
+<table><thead><tr><th>类型</th><th>字段</th><th>生效时机</th></tr></thead><tbody>
+<tr><td>静态配置</td><td><code>staff_language</code> / <code>lang_pairs</code> / <code>lid_theta</code> / <code>lid_theta_super</code> / <code>min_utt_duration_ms</code> / <code>kws_whitelist</code> / <code>brand_words</code> / 数字过滤 / <code>idle_timeout_ms</code> / 音量 / <code>endpoint</code></td><td>设备唤醒 pull 时生效</td></tr>
+<tr><td>会话动态</td><td>兜底话术更新 / 强制扬声器</td><td>会话中 config_update 推，低频</td></tr>
+</tbody></table>
+<p><code>config</code> 示例：</p>
+<pre><code>
+{
+  &quot;staff_language&quot;: &quot;ja-JP&quot;,
+  &quot;lang_pairs&quot;: [&quot;zh-ja&quot;, &quot;en-ja&quot;, &quot;ko-ja&quot;],
+  &quot;lid_theta&quot;: 0.8,
+  &quot;lid_theta_super&quot;: 0.95,
+  &quot;min_utt_duration_ms&quot;: 500,
+  &quot;kws_whitelist&quot;: [&quot;OK&quot;, &quot;はい&quot;, &quot;ありがとう&quot;],
+  &quot;brand_words&quot;: [&quot;iPhone&quot;, &quot;LV&quot;],
+  &quot;numeric_filter&quot;: true,
+  &quot;idle_timeout_ms&quot;: 20000,
+  &quot;volume&quot;: {&quot;speaker&quot;: 60, &quot;headset&quot;: 40},
+  &quot;endpoint&quot;: &quot;wss://...&quot;
+}
+</code></pre>
+<blockquote>⚠️ LID 策略仍缺「第三语言处理」「软锁定连续 N 次/更新阈值」等可配置项，联调前在后台 LID 策略域补齐（架构 §11 语言策略域）。</blockquote>
+<p>设备唤醒/重连发 <code>config_pull</code> 拉最新（带 config_version，只拉变更）；会话中低频变更用 <code>config_update</code> 推。</p>
+<hr>
+<h2>8. OTA 升级（独立通道）</h2>
+<ul>
+<li><strong>通道</strong>：独立 HTTPS 文件下载，不经 WSS 音频通道。</li>
+<li><strong>下发</strong>：云端通过 config_update 下发 ota 信息（目标模块、目标版本、包 URL、SHA256、依赖/顺序）。</li>
+<li><strong>上报</strong>：设备用 <code>button_event</code> 或专用 <code>ota_event</code>（预留）上报进度/结果。</li>
+<li><strong>目标模块</strong>：ESP32-P4 主固件 / ESP32-C5 无线固件 / IA8201 参数，三类独立管理。</li>
+<li>⚠️ 具体 ota 字段、升级顺序、失败回滚、断电恢复，由 ODM 定义，联调前冻结。</li>
+</ul>
+<hr>
+<h2>9. 已冻结参数清单（ODM 已确认）</h2>
+<table><thead><tr><th>参数</th><th>冻结值</th><th>说明</th></tr></thead><tbody>
+<tr><td>采样率</td><td>16kHz</td><td>端侧/云端一致</td></tr>
+<tr><td>音频编码</td><td>PCM 16bit 单声道；上行裸 PCM（不含头），下行 TTS 带 44 字节 WAV 头（RIFF，小端 little-endian）</td><td>v1 固定；未来 Opus 需协商</td></tr>
+<tr><td>上行帧长</td><td>100ms</td><td>每 0x01 帧约 100ms 音频</td></tr>
+<tr><td>TTS 下行分片</td><td>≤8KB（约 100ms）</td><td>首帧即播</td></tr>
+<tr><td>单帧上限</td><td>≤8KB</td><td>音频分片上限</td></tr>
+<tr><td>心跳</td><td>10s</td><td>WS ping/pong，连续 2–3 次无 pong 判死 → 断线重连</td></tr>
+<tr><td>会话空闲超时</td><td>20s</td><td>无有效语音/按键自动结束并断开</td></tr>
+<tr><td>LID 阈值 θ / θ_super</td><td>不适用（移除）</td><td>auto 模式用一步 auto-detect，不依赖置信度</td></tr>
+<tr><td>背压/流控</td><td>1.0 暂不做</td><td>仅约定断连清理会话缓冲</td></tr>
+</tbody></table>
+<hr>
+<h2>10. 甲方硬性要求（TTS 打断三条）</h2>
+<ol>
+<li><strong>端侧打断四步 ≤100ms、断网可用</strong>（产品级验收）。</li>
+<li><strong>P4↔IA8201 必须有 AEC 播放参考通路</strong>（语音抢占打断的前提）。</li>
+<li><strong>迟到的 TTS 分片按 turn_id 丢弃、云端容忍中途断流不记错</strong>。</li>
+</ol>
+<hr>
+<h2>附录：与架构文档的对应关系</h2>
+<table><thead><tr><th>本规范章节</th><th>架构文档</th></tr></thead><tbody>
+<tr><td>§1 连接鉴权 / scope</td><td>§4、§8.2、§9.5</td></tr>
+<tr><td>§2 帧结构</td><td>§4、附录 B</td></tr>
+<tr><td>§3/§4 消息</td><td>§4 端云接口契约</td></tr>
+<tr><td>§5 时序</td><td>§3.1、§6.5、§10.3</td></tr>
+<tr><td>§6 错误码</td><td>§10.2</td></tr>
+<tr><td>§7 配置</td><td>§11</td></tr>
+<tr><td>§8 OTA</td><td>§11.5</td></tr>
+<tr><td>§9 已冻结参数</td><td>0804 §10.1</td></tr>
+<tr><td>§10 硬性要求</td><td>§6.7</td></tr>
+</tbody></table></body></html>

@@ -1,0 +1,18 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>AI 工牌 1.0 · 耳麦回声风险评审回复</title><style>
+@page { size: A4; margin: 2.2cm 2.4cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.65; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', 'Microsoft YaHei', sans-serif;
+       font-size: 18pt; font-weight: 700; text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 18pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+ul { margin: 2pt 0 4pt; padding-left: 0; list-style: none; }
+ul li { margin: 0 0 5pt; padding-left: 12pt; text-indent: -12pt; }
+ul li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+span.pre { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 4pt 0 12pt; font-size: 9.8pt; }
+th, td { border: 1px solid #b9c4d4; padding: 5pt 7pt; vertical-align: middle; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+</style></head><body><div class='doctitle'>AI 工牌 1.0 · 耳麦回声风险评审回复</div><div class='subtitle'>云侧评审意见 · 2026-09-12 · 用于三方周例会</div><h2>一、问题本质：端侧一条风险实际叠了三层</h2><ul><li><span class='pre'>回声消除 AEC：</span>需要「参考信号（外放 TTS 原音）」+「近端信号（耳麦采到的声音）」两路输入，在同一点做减法。</li><li><span class='pre'>打断 Barge-in：</span>员工在播报途中开口，设备停播并转采员工语音；它必须建立在 AEC 成立之上，否则员工声被 TTS 回声淹没。</li><li><span class='pre'>采播互斥（半双工兜底）：</span>播的时候不采、播完再采；能防啸叫，但放弃打断。</li></ul><h2>二、为什么「大模型按语种处理」不可行</h2><ul><li><span class='pre'>时序错位：</span>回声是音频波形层的物理叠加，语种是语义层信息；AEC 必须先于 ASR / 语种判定完成，语种信息来不及参与。</li><li><span class='pre'>判出语种也抠不掉：</span>回声是外放音经空气/机壳反射回来的「延迟副本」，与员工真实语音叠加在同一路采样里，靠语种无法把叠加分量分离。</li><li><span class='pre'>反向依赖：</span>AEC 没做会污染输入，ASR 和语种判定自己都失真——语种这个「事后信息」反而依赖回声这个「事前问题」先解决。</li></ul><h2>三、甲方 Loopback 方案评估</h2><ul><li><span class='pre'>正确之处：</span>从 Smart PA DAC 引一条参考线送入 8201 Reference Input，补齐了 AEC 两路输入中的「参考信号」一路。</li><li><span class='pre'>关键漏洞：</span>只解决了「参考信号」，而耳麦的「近端信号」仍接在 P4 的 Codec 上——减法（参考）与被减数（近端）不在同一个处理器，AEC 做不成闭环。</li><li><span class='pre'>甲方已自认：</span>甲方补的「P4 软件做简单侧音抑制」≈ 采播互斥：检测到外放就压低耳麦增益/静音，员工一开口被一起压掉，打断能力并未兑现。</li></ul><h2>四、可行方案（优 → 劣）</h2><ul><li><span class='pre'>① 耳麦信号也引入 8201：</span>近端 + 参考两路都在 8201，完整 AEC，真打断成立。唯一能「边播边打断」的正解，须在 9.15 原理图冻结前决策。</li><li><span class='pre'>② 参考信号分一路给 P4 做 AEC：</span>理论可行，但 P4 是通用处理器、非音频 DSP，AEC 是重量级任务，会拖累它正在跑的翻译主链路，不推荐。</li><li><span class='pre'>③ 采播互斥 / 侧音抑制兜底：</span>能防啸叫、保证播报不被自身声音干扰，但牺牲打断——播长句时员工只能等播完才能插话。</li></ul><table><thead><tr><th>方案</th><th>能否真打断</th><th>时延/算力</th><th>开发难度</th><th>定位</th></tr></thead><tbody><tr><td>① 耳麦引入 8201</td><td>能</td><td>最优（专用 DSP）</td><td>低-中（改电路）</td><td>根治，正解</td></tr><tr><td>② 参考分路 P4 做 AEC</td><td>能（勉强）</td><td>差（P4 非 DSP）</td><td>高</td><td>不推荐</td></tr><tr><td>③ 采播互斥 / 侧音抑制</td><td>不能</td><td>无额外</td><td>低</td><td>兜底，验收降级</td></tr></tbody></table><h2>五、与「VAD 卸载至 P4」方案的耦合（易漏）</h2><ul><li>耳麦接在 P4，VAD 又卸载到 P4 → P4 上的 VAD 用的就是耳麦信号。</li><li>耳麦信号混了 TTS 外放回声 → VAD 会把外放 TTS 误判为「有人说话」，导致误唤醒或漏判员工开口。</li><li>结论：耳麦回声不解决，方案①的 VAD 也会失灵，两个问题不能分开谈。</li></ul><h2>六、需端侧在 9.15 原理图冻结前决策的硬项</h2><ul><li>耳麦到底能否引入 8201？这是「真打断 vs 采播互斥」的分水岭，过了冻结窗口就只能走降级路线。</li></ul><h2>七、云侧立场</h2><ul><li>云侧不做回声消除，这是端侧实时职责；云侧只配合协议。</li><li>端侧做到真 AEC → 云侧按「打断」模式配合（播放中收到员工语音即停播、切采集）。</li><li>端侧只能采播互斥 → 云侧按「播完再采」降级验收，并把「打断」从联调必测项明确降级。</li></ul></body></html>

@@ -77,8 +77,21 @@ TTS 音频回包 -> 设备扬声器外放
 - 通信：双频 Wi-Fi（日本版）+ 可选 4G Cat.1；FPC 天线；BLE 仅预留配网/维护。
 - 供电：~1000mAh 超薄电池，Type-C 5V/1A 慢充。
 
-## 后续编码开工时需补充本文件的内容
+## 构建与测试（⚠️ 必须 JDK 17）
 
-- 实际仓库结构（端侧固件 / 云端 Middleware / H5 后台 通常会分仓或分目录）。
-- 构建、lint、测试、单测运行命令（按所选语言/框架填写）。
-- 音频流协议、连续对话状态机的具体实现文档位置。
+- 技术栈：Java 17 + Spring Boot 3.3.5 + Maven（模块化单体，包 `com.aicard`）。
+- **必须用 JDK 17 编译**：Lombok 1.18.34 不支持 JDK 25，默认 JDK 25 会导致所有 `@Getter/@Builder` 失效、编译报 `cannot find symbol`。
+- 构建：`export JAVA_HOME=/Library/Java/JavaVirtualMachines/jdk-17.jdk/Contents/Home && mvn clean package -DskipTests`
+- 测试：`export JAVA_HOME=<jdk17> && mvn test`（集成测试需本地 Docker；无 Docker 时只跑单元测试：`mvn test -Dtest="BroadcastServiceTest,GroupServiceTest"`）
+- 打包产物：`target/aicard-0.1.0-SNAPSHOT.jar`，Docker 镜像构建目录 `/tmp/aicard/`。
+
+## 代码结构（主要包）
+
+- `gateway/` 设备接入（WSS 网关、协议编解码、会话、连接注册表）
+- `translation/` 翻译链路（编排、LID 决策、质量门控）
+- `provider/` 供应商抽象（SpeechProvider、ProviderRouter）
+- `skb/` 员工知识库（受控 RAG + LLM/Embedding）
+- `broadcast/` 分组多语言广播（群组 + 广播编排 + 投递回执）
+- `ingestion/` 旁路采集；`admin/` 运营后台；`common/` 租户/领域/仓储
+
+详见各 `docs/` 与 `deploy-docs/运维部署说明.md`。

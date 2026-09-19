@@ -1,0 +1,21 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>云侧下周工作计划</title><style>
+@page { size: A4; margin: 2.2cm 2.4cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.65; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', 'Microsoft YaHei', sans-serif;
+       font-size: 18pt; font-weight: 700; text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 10pt; }
+.intro { margin: 0 0 6pt; color: #333; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+h3 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 11.5pt; font-weight: 700;
+       color: #1a3c6e; margin: 10pt 0 3pt; }
+ul { margin: 2pt 0 4pt; padding-left: 0; list-style: none; }
+ul li { margin: 0 0 5pt; padding-left: 12pt; text-indent: -12pt; }
+ul li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+span.pre { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 4pt 0 12pt; font-size: 9.8pt; }
+th, td { border: 1px solid #b9c4d4; padding: 5pt 7pt; vertical-align: middle; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+</style></head><body><div class='doctitle'>云侧下周工作计划</div><div class='subtitle'>2026-09-14 ~ 09-18 · 基于 9.12 三方例会待办</div><p class='intro'>本周主线：把「翻译质量门控」从「能跑」做到「可配置 + 已验证」；搭起 OTA 配置骨架；行业方向预研收口。</p><h2>一、任务清单</h2><h3>任务一（重点）· 语言漂移 + 品牌词表白名单测试</h3><ul><li><span class='pre'>目标：</span>验证 visitor_language 防漂移 + 品牌词表 / 白名单门控效果，产出测试报告。</li><li><span class='pre'>步骤：</span>① 设计测试用例（换游客不重置 / 夹杂语言方向漂移 / 品牌词命中与未命中 / 白名单命中）；② 用模拟器（simulator.html）执行；③ 记录低置信度日志、验证降级策略。</li><li><span class='pre'>交付：</span>测试用例文档 + 测试报告 + 问题清单。</li><li><span class='pre'>依赖：</span>模拟器已可用。</li></ul><h3>任务二 · 品牌词表白名单后台静态配置</h3><ul><li><span class='pre'>目标：</span>把当前硬编码的品牌词表 + 白名单改为后台可配。</li><li><span class='pre'>步骤：</span>① 后台新增品牌词表 / 白名单 CRUD 接口；② 后台 UI 页面；③ 配置实时下发到翻译链路生效。</li><li><span class='pre'>交付：</span>后台可配功能上线。</li><li><span class='pre'>联动：</span>与任务一联动：测试发现的问题可直接改配置复测。</li></ul><h3>任务三（视情况）· OTA 配置服务</h3><ul><li><span class='pre'>目标：</span>搭起 OTA 配置服务，或提供内网 VPN 供端侧自建。</li><li><span class='pre'>步骤：</span>① 评估复用现有芯片 OTA 方案 vs 云端自建；② 搭建配置下发服务（语言对 / LID 策略 / 品牌词表等）；③ 与端侧确认下发通道（MQTT / 等价）。</li><li><span class='pre'>交付：</span>OTA 配置服务可用，或 VPN 打通。</li><li><span class='pre'>依赖：</span>需端侧提供芯片 OTA 方案信息。</li></ul><h3>任务四（轻量）· 行业场景方向建议</h3><ul><li><span class='pre'>目标：</span>把「分组多语言广播能力」提案整理成正式方向建议（可选补充其他场景）。</li><li><span class='pre'>交付：</span>方向建议文档。</li></ul><h2>二、协同与依赖（需他方）</h2><ul><li><span class='pre'>蒋旭 UI 需求动机（周一）：</span>后续 H5 对接依据，需及时收到。</li><li><span class='pre'>时延口径对齐：</span>纪要「2 秒以内」 vs PRD &lt;1.5s，与端侧澄清是端到端还是云端处理。</li><li><span class='pre'>端侧耳麦接入方案（TT 主导）：</span>云侧了解即可，影响后续真机联调。</li><li><span class='pre'>9.15 端侧原理图冻结：</span>云侧配合确认硬件边界（外扩内存 / 空余音频输入）。</li></ul><h2>三、时间线</h2><table><thead><tr><th>日期</th><th>重点</th></tr></thead><tbody><tr><td>9.14（周一）</td><td>行业场景建议收口；品牌词表白名单后台开工；等蒋旭 UI 动机</td></tr><tr><td>9.15（周二）</td><td>后台配置开发；语言漂移测试用例设计；端侧原理图冻结（协同）</td></tr><tr><td>9.16（周三）</td><td>语言漂移 + 品牌词表白名单测试执行；后台配置联调</td></tr><tr><td>9.17（周四）</td><td>OTA 配置服务搭建；测试报告整理</td></tr><tr><td>9.18（周五）</td><td>OTA 收尾；周报汇总；下周计划</td></tr></tbody></table><h2>四、风险 / 阻塞</h2><ul><li>时延口径未对齐可能影响联调验收。</li><li>OTA 方案取决于端侧芯片能力，可能延期。</li><li>蒋旭 UI 动机若延迟，H5 相关项顺延。</li></ul></body></html>

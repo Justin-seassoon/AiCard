@@ -1,0 +1,28 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>品牌词表白名单后台 · 测试指南</title><style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.6; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 18pt; font-weight: 700;
+       text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 14pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+h3 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 11pt; font-weight: 700;
+       color: #1a3c6e; margin: 10pt 0 3pt; }
+p { margin: 3pt 0; }
+li { margin: 0 0 4pt; padding-left: 12pt; text-indent: -12pt; }
+li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+span.pre { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+pre { background: #f4f6f9; border: 1px solid #e0e5ec; border-radius: 4px;
+      padding: 7pt 10pt; margin: 5pt 0; font-size: 8.8pt; line-height: 1.45;
+      white-space: pre-wrap; word-wrap: break-word; font-family: 'Menlo', 'SF Mono', monospace; }
+table { border-collapse: collapse; width: 100%; margin: 5pt 0 10pt; font-size: 9pt; }
+th, td { border: 1px solid #b9c4d4; padding: 4pt 7pt; vertical-align: top; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+</style></head><body><div class='doctitle'>品牌词表白名单后台 · 测试指南</div><div class='subtitle'>v1.0 · 2026-09-16 · 提交测试人员</div><h2>一、功能概述</h2><p>品牌词表（brand）和短词白名单（whitelist）改为后台可配置：运营/门店可通过 REST 接口增删查，动态生效（无需重启）。</p><p>作用：质量门控——游客说「品牌词」（如 iPhone、Dyson）或「白名单短句」（如 OK、ありがとう）时，不更新语言记忆，避免员工方向翻译被无效语音带偏。</p><p>说明：默认词表（application.yml 里的一批品牌词/白名单）仍然生效作为「基线」，后台添加的词在其上追加；词条统一按小写存储。</p><h2>二、测试环境</h2><li><span class='pre'>服务器：</span>内网 10.0.189.32，端口 8080。</li><li><span class='pre'>鉴权：</span>每个请求头须带租户标识 X-Customer-Id: 1 与 X-Store-Id: 1。</li><h2>三、API 操作（curl）</h2><h3>3.1 查列表</h3><pre>curl &quot;http://10.0.189.32:8080/api/qualify-terms?type=brand&quot; \
+  -H &quot;X-Customer-Id: 1&quot; -H &quot;X-Store-Id: 1&quot;</pre><p>type 传 brand（品牌词）或 whitelist（白名单）。</p><h3>3.2 添加词条</h3><pre>curl -X POST http://10.0.189.32:8080/api/qualify-terms \
+  -H &quot;Content-Type: application/json&quot; \
+  -H &quot;X-Customer-Id: 1&quot; -H &quot;X-Store-Id: 1&quot; \
+  -d &#x27;{&quot;type&quot;:&quot;brand&quot;,&quot;term&quot;:&quot;dyson&quot;}&#x27;</pre><p>type 传 brand 或 whitelist；term 为词条（自动转小写）。返回 {&quot;id&quot;:1,&quot;type&quot;:&quot;brand&quot;,&quot;term&quot;:&quot;dyson&quot;}，记下 id。</p><h3>3.3 删除词条</h3><pre>curl -X DELETE http://10.0.189.32:8080/api/qualify-terms/1 \
+  -H &quot;X-Customer-Id: 1&quot; -H &quot;X-Store-Id: 1&quot;</pre><p>路径末尾的 1 是要删词条的 id（从查列表/添加返回里拿）。</p><h2>四、测试场景（用例）</h2><table><thead><tr><th>#</th><th>场景</th><th>操作</th><th>预期结果</th></tr></thead><tbody><tr><td>1</td><td>添加品牌词</td><td>POST type=brand, term=dyson</td><td>返回 id，term 为小写 dyson</td></tr><tr><td>2</td><td>添加白名单</td><td>POST type=whitelist, term=わかりました</td><td>返回 id</td></tr><tr><td>3</td><td>查列表</td><td>GET ?type=brand</td><td>包含刚加的词</td></tr><tr><td>4</td><td>大小写归一化</td><td>POST term=IPHONE</td><td>存储为 iphone</td></tr><tr><td>5</td><td>删除词条</td><td>DELETE /{id}</td><td>删除后查列表不再出现</td></tr><tr><td>6</td><td>重复添加</td><td>POST 同一个 type+term 两次</td><td>第二次报错（唯一约束）</td></tr><tr><td>7</td><td>词条去空格</td><td>POST term=  dyson  </td><td>存储为 dyson（去首尾空格）</td></tr></tbody></table><h2>五、动态生效验证</h2><p>改词表后无需重启。验证方法：添加一个品牌词后，在模拟器（https://aicard.seassoon.net/）按住说话说这个词，后端日志会出现「quality gate filtered」；删除该词后再说，则正常翻译（不再过滤）。</p><li><span class='pre'>验证点 1：</span>添加品牌词 dyson → 模拟器说「Dyson」→ 日志出现 quality gate filtered（品牌词被门控拦截）。</li><li><span class='pre'>验证点 2：</span>删除 dyson → 模拟器再说「Dyson」→ 正常翻译（门控不再拦截）。</li><h2>六、预期结果汇总</h2><li><span class='pre'>：</span>增删查接口均返回正确、词条小写归一化、重复添加被唯一约束拦截。</li><li><span class='pre'>：</span>改词表后立即生效（无需重启），品牌词/白名单命中时质量门控拦截、不污染语言记忆。</li></body></html>

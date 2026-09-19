@@ -1,0 +1,18 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>语言漂移 + 品牌词表白名单 · 测试用例与结论</title><style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.6; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 18pt; font-weight: 700;
+       text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 14pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+p { margin: 3pt 0; }
+li { margin: 0 0 4pt; padding-left: 12pt; text-indent: -12pt; }
+li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+span.pre { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 5pt 0 10pt; font-size: 9pt; }
+th, td { border: 1px solid #b9c4d4; padding: 4pt 7pt; vertical-align: top; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+</style></head><body><div class='doctitle'>语言漂移 + 品牌词表白名单 · 测试用例与结论</div><div class='subtitle'>v1.0 · 2026-09-13 · 质量门控 + 软锁定记忆</div><h2>一、测试目标</h2><p>验证质量门控（品牌词表 / 短词白名单 / 数字 / 短句）是否有效防止污染 visitor_language 记忆，并验证语言漂移（换游客、夹杂语言）的现状行为，为联调防漂移评估建立基线。</p><p>核心机制：只有「正常句子」（NORMAL）才会锁定 visitor_language 记忆；品牌词 / 白名单 / 数字 / 短句一律不锁，避免员工方向被无效语音带偏。</p><h2>二、质量门控测试用例（品牌词表白名单）</h2><table><thead><tr><th>#</th><th>场景</th><th>输入示例</th><th>判定</th><th>记忆是否锁定</th></tr></thead><tbody><tr><td>1</td><td>品牌词</td><td>iPhone 15 / Dyson / 资生堂</td><td>BRAND</td><td>不锁</td></tr><tr><td>2</td><td>白名单短词</td><td>OK / ありがとう / 谢谢</td><td>WHITELIST</td><td>不锁</td></tr><tr><td>3</td><td>纯数字</td><td>12345 / ¥1,200 / 3.5%</td><td>NUMERIC</td><td>不锁</td></tr><tr><td>4</td><td>短句 / 空</td><td>时长 &lt; 200ms 或空文本</td><td>SHORT</td><td>不锁</td></tr><tr><td>5</td><td>正常句子</td><td>我想买一个包</td><td>NORMAL</td><td>锁</td></tr></tbody></table><p>匹配规则：品牌词用「包含」匹配（大小写不敏感，如 iphone 命中 iPhone 15）；白名单用「精确」匹配（整句等于词条）。</p><h2>三、语言漂移测试用例</h2><table><thead><tr><th>#</th><th>场景</th><th>操作</th><th>现状行为</th><th>是否需防漂移</th></tr></thead><tbody><tr><td>1</td><td>正常锁记忆</td><td>游客说中文 → 员工说话</td><td>员工方向 ja→zh-CN，正确</td><td>否</td></tr><tr><td>2</td><td>换游客·正常句</td><td>游客A中文 → 游客B英语(NORMAL)</td><td>记忆更新为 en-US，正确</td><td>否</td></tr><tr><td>3</td><td>换游客·首句品牌词</td><td>游客A中文 → 游客B首句说品牌词</td><td>记忆保持 zh-CN（本应 en-US）</td><td>是（已知局限）</td></tr><tr><td>4</td><td>夹杂语言</td><td>同一游客中文 → 英文(NORMAL)</td><td>记忆覆盖为 en-US（跟最近一句）</td><td>视体验</td></tr><tr><td>5</td><td>员工方向冲突</td><td>员工说非 staff 语言（高置信）</td><td>返回 conflict，不外放</td><td>否</td></tr></tbody></table><h2>四、已知局限与联调验证点</h2><li><span class='pre'>换客重置（A）：</span>换游客后记忆不重置：新游客首句若是品牌词 / 白名单等非 NORMAL 语音，记忆停留在上一个游客的语言。1.0 暂不实现，可依赖 sleep_notice 或断连重连清 states。</li><li><span class='pre'>员工方向防漂移（B）：</span>员工方向 = staff_language → visitor_language（唯一读记忆处）；同一游客夹杂语言时，员工方向跟着最近一句漂移。1.0 暂不实现「连续两句确认」。</li><li><span class='pre'>决策：</span>联调时观察真实误判率；若员工方向漂移 / 换客残留影响体验，优先补 A，再考虑 B。</li><h2>五、本次测试结论</h2><li><span class='pre'>新增测试：</span>TranslationHandlerQualityGateTest 6 个测试，全部通过；全量 100 测试 0 失败（6 个 Error 为 Docker 环境缺失，与本次无关）。</li><li><span class='pre'>质量门控有效：</span>品牌词 / 白名单 / 数字 / 短句均不污染记忆，正常句锁记忆。</li><li><span class='pre'>语言漂移现状：</span>换游客夹杂品牌词会保持旧记忆（已知局限），夹杂正常语言会覆盖记忆——两者均按预期运行，待联调评估是否补防漂移。</li></body></html>

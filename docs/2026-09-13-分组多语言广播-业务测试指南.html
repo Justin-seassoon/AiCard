@@ -1,0 +1,20 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>分组多语言广播 · 业务测试指南</title><style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.6; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 18pt; font-weight: 700;
+       text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 14pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+h3 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 11pt; font-weight: 700;
+       color: #1a3c6e; margin: 10pt 0 3pt; }
+p { margin: 3pt 0; }
+li { margin: 0 0 4pt; padding-left: 12pt; text-indent: -12pt; }
+li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+span.pre { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 5pt 0 10pt; font-size: 9pt; }
+th, td { border: 1px solid #b9c4d4; padding: 4pt 7pt; vertical-align: top; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+</style></head><body><div class='doctitle'>分组多语言广播 · 业务测试指南</div><div class='subtitle'>v1.0 · 2026-09-13 · 通过云端模拟器测试</div><h2>一、这是什么功能</h2><p>管理员发一条通知，云端自动翻译成每个工牌各自的母语，推送到各工牌显示并播报；员工按「确认收到」回执，管理员在后台看谁已收到、谁没收到。</p><p>典型场景：工地多国劳工的统一命令传达、安全须知、信息确认等「一对多」通知。</p><h2>二、测试准备</h2><li><span class='pre'>浏览器：</span>Chrome（推荐）。</li><li><span class='pre'>访问地址：</span>https://aicard.seassoon.net/（工牌模拟器页面）。</li><li><span class='pre'>已预置：</span>一个「群」（群 ID = 1），群里有 3 台工牌：demo-device-001（日语）、test-dev-002（日语）、dev-vi-001（越南语）。</li><h2>三、测试步骤</h2><h3>步骤 1：开 3 个标签页，模拟 3 台工牌</h3><li>打开 https://aicard.seassoon.net/，再复制出 2 个标签页（共 3 个）。</li><li>每个标签页在「device_id」输入框分别填：demo-device-001 / dev-vi-001 / test-dev-002。</li><li>每个标签页点「连接」按钮（3 个都要连）。</li><h3>步骤 2：发广播（管理员操作）</h3><li>在任意一个标签页，往下找到「📢 分组广播」区域。</li><li>群 ID 保持 1；源语言选「ja-JP（日语）」；输入广播内容（如：安全须知，请佩戴安全帽）。</li><li>点「发送广播」按钮。</li><h3>步骤 3：观察工牌收到广播</h3><li>三个标签页的「本机收到的广播（墨水屏模拟）」区域会显示译文，扬声器同时播报。</li><li>预期：日语工牌显示日语原文，越南语工牌显示越南语翻译。</li><h3>步骤 4：回执</h3><li>每个标签页点「✅ 确认收到」按钮，表示该工牌已确认收到。</li><h2>四、重点测试点</h2><table><thead><tr><th>#</th><th>测试点</th><th>操作</th><th>预期结果</th></tr></thead><tbody><tr><td>1</td><td>多语言翻译</td><td>发一条日语广播</td><td>越南语工牌显示越南语，日语工牌显示日语原文</td></tr><tr><td>2</td><td>回执</td><td>收到广播后点「确认收到」</td><td>后台能查到该工牌已确认（ack_at 有值）</td></tr><tr><td>3</td><td>离线补拉</td><td>某标签页先「断开」，发广播后再「连接」</td><td>重连后能收到刚才错过的广播</td></tr></tbody></table><h2>五、注意事项</h2><li>3 个标签页都要点「连接」，否则收不到广播。</li><li>页面里「按住说话」「OK」「打断」等是翻译功能，测广播时不用管。</li><li>某个标签页收不到广播时，先点「断开」再「连接」重试。</li></body></html>
