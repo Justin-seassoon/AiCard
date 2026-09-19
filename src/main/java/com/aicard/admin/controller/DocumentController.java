@@ -1,6 +1,7 @@
 package com.aicard.admin.controller;
 
 import com.aicard.admin.dto.DocumentImportRequest;
+import com.aicard.admin.dto.DocumentSummaryDto;
 import com.aicard.common.tenant.Tenant;
 import com.aicard.common.tenant.TenantContext;
 import com.aicard.skb.model.Chunk;
@@ -8,13 +9,16 @@ import com.aicard.skb.model.Document;
 import com.aicard.skb.provider.EmbeddingProvider;
 import com.aicard.skb.seed.KeywordExtractor;
 import com.aicard.skb.store.KnowledgeStore;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.List;
 
 /**
  * 后台知识库管理：导入文档（draft）+ 发布。embedding 由后端生成，前端只传文本。
@@ -31,6 +35,13 @@ public class DocumentController {
         this.store = store;
         this.embeddings = embeddings;
         this.keywordExtractor = keywordExtractor;
+    }
+
+    @GetMapping
+    public List<DocumentSummaryDto> list(@RequestParam(defaultValue = "skb") String domain) {
+        Tenant t = TenantContext.require();
+        return store.listDocuments(t.customerId(), t.storeId(), domain).stream()
+                .map(DocumentSummaryDto::from).toList();
     }
 
     @PostMapping

@@ -11,7 +11,7 @@ import java.util.List;
  *
  * 消息 type：session_init | eou | stop_tts | sleep_notice | button_event |
  *            playback_event | scope_change | translation_mode_change |
- *            headset_event | config_pull
+ *            headset_event | config_pull | broadcast_ack
  */
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -42,5 +42,7 @@ public record InboundMessage(
         String wifiBand,
         String networkState,
         Integer configVersion,
-        List<String> candidates
+        List<String> candidates,
+        // broadcast_ack
+        Long broadcastId
 ) {}

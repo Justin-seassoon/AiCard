@@ -1,5 +1,6 @@
 package com.aicard.gateway.handler;
 
+import com.aicard.broadcast.service.BroadcastService;
 import com.aicard.gateway.protocol.AudioChunkFrame;
 import com.aicard.gateway.protocol.InboundMessage;
 import com.aicard.gateway.session.SessionContext;
@@ -15,10 +16,11 @@ class GatewayWebSocketHandlerTest {
 
     private final TranslationHandler translation = mock(TranslationHandler.class);
     private final SkbHandler skb = mock(SkbHandler.class);
+    private final BroadcastService broadcastService = mock(BroadcastService.class);
     private final SessionManager sessions = new SessionManager();
 
     private GatewayWebSocketHandler handler() {
-        return new GatewayWebSocketHandler(translation, skb);
+        return new GatewayWebSocketHandler(translation, skb, broadcastService);
     }
 
     private SessionContext ctx(String scope) {

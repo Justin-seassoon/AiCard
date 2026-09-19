@@ -1,5 +1,6 @@
 package com.aicard.gateway.handler;
 
+import com.aicard.broadcast.service.BroadcastService;
 import com.aicard.gateway.protocol.AudioChunkFrame;
 import com.aicard.gateway.protocol.InboundMessage;
 import com.aicard.gateway.session.SessionContext;
@@ -14,10 +15,13 @@ public class GatewayWebSocketHandler {
 
     private final TranslationHandler translation;
     private final SkbHandler skb;
+    private final BroadcastService broadcastService;
 
-    public GatewayWebSocketHandler(TranslationHandler translation, SkbHandler skb) {
+    public GatewayWebSocketHandler(TranslationHandler translation, SkbHandler skb,
+                                   BroadcastService broadcastService) {
         this.translation = translation;
         this.skb = skb;
+        this.broadcastService = broadcastService;
     }
 
     public void handleAudio(SessionContext ctx, AudioChunkFrame frame) {
@@ -53,6 +57,7 @@ public class GatewayWebSocketHandler {
                     translation.onStopTts(ctx, msg);
                 }
             }
+            case "broadcast_ack" -> broadcastService.ack(msg.broadcastId(), ctx.deviceId());
             default -> { /* sleep_notice / button_event / playback_event / headset_event / config_pull 由 transport 层处理 */ }
         }
     }

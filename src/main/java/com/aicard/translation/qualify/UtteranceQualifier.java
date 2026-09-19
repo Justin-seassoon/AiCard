@@ -17,18 +17,13 @@ public class UtteranceQualifier {
 
     private final long minDurationMs;      // <0 关闭 short 门控
     private final boolean numericFilter;
-    private final Set<String> whitelist;   // 小写归一化，精确匹配
-    private final Set<String> brandTerms;  // 小写归一化，包含匹配
 
-    public UtteranceQualifier(long minDurationMs, boolean numericFilter,
-                              Set<String> whitelist, Set<String> brandTerms) {
+    public UtteranceQualifier(long minDurationMs, boolean numericFilter) {
         this.minDurationMs = minDurationMs;
         this.numericFilter = numericFilter;
-        this.whitelist = whitelist;
-        this.brandTerms = brandTerms;
     }
 
-    public UtteranceQuality qualify(String text, Long durationMs) {
+    public UtteranceQuality qualify(String text, Long durationMs, Set<String> whitelist, Set<String> brandTerms) {
         if (minDurationMs > 0 && durationMs != null && durationMs < minDurationMs) {
             return UtteranceQuality.SHORT;
         }
@@ -40,10 +35,10 @@ public class UtteranceQualifier {
             return UtteranceQuality.NUMERIC;
         }
         String lower = trimmed.toLowerCase();
-        if (!brandTerms.isEmpty() && brandTerms.stream().anyMatch(lower::contains)) {
+        if (brandTerms != null && !brandTerms.isEmpty() && brandTerms.stream().anyMatch(lower::contains)) {
             return UtteranceQuality.BRAND;
         }
-        if (whitelist.contains(lower)) {
+        if (whitelist != null && whitelist.contains(lower)) {
             return UtteranceQuality.WHITELIST;
         }
         return UtteranceQuality.NORMAL;

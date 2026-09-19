@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 工牌 · 演示控制台</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif;
+    background: #0b1622; color: #e8eef5; font-size: 14px; line-height: 1.6;
+  }
+  .topbar { background: #0f2130; padding: 14px 24px; display: flex; align-items: center; gap: 18px; border-bottom: 1px solid #1e3548; }
+  .topbar .brand { font-size: 18px; font-weight: 700; }
+  .topbar .brand small { display: block; font-size: 12px; color: #7b93a8; font-weight: 400; }
+  .industry-tabs { display: flex; gap: 8px; margin-left: auto; }
+  .industry-tabs button { padding: 8px 18px; font-size: 14px; font-weight: 600; border: 1px solid #2a4a63; background: transparent; color: #9fb3c8; border-radius: 20px; cursor: pointer; }
+  .industry-tabs button.active { background: #2e6da4; color: #fff; border-color: #2e6da4; }
+
+  .layout { display: flex; min-height: calc(100vh - 58px); }
+  .script-panel { width: 42%; padding: 20px; border-right: 1px solid #1e3548; overflow-y: auto; }
+  .dashboard-panel { flex: 1; padding: 20px; overflow-y: auto; }
+
+  .step { background: #0f2130; border: 1px solid #1e3548; border-radius: 10px; padding: 14px 16px; margin-bottom: 12px; cursor: pointer; transition: all .15s; }
+  .step:hover { border-color: #2e6da4; }
+  .step.active { border-color: #2e6da4; background: #122a3d; }
+  .step .head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .step .tag { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 15px; flex-shrink: 0; }
+  .step:nth-child(1) .tag { background: #2e6da4; }
+  .step:nth-child(2) .tag { background: #1a7f37; }
+  .step:nth-child(3) .tag { background: #b8860b; }
+  .step:nth-child(4) .tag { background: #7b4db8; }
+  .step:nth-child(5) .tag { background: #c62828; }
+  .step:nth-child(6) .tag { background: #0e7490; }
+  .step .title { font-size: 15px; font-weight: 700; }
+  .step .value { font-size: 12px; color: #7b93a8; }
+  .step .body { display: none; margin-top: 8px; border-top: 1px dashed #1e3548; padding-top: 8px; }
+  .step.active .body { display: block; }
+  .step .body .demo { color: #6ee7b7; margin-bottom: 4px; }
+  .step .body .talk { color: #cbd8e4; font-size: 13px; }
+
+  .panel-title { font-size: 13px; color: #7b93a8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+  .card { background: #0f2130; border: 1px solid #1e3548; border-radius: 10px; padding: 16px; margin-bottom: 14px; }
+  .card h3 { font-size: 14px; color: #9fb3c8; margin-bottom: 10px; }
+
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .bar-row .lbl { width: 46px; font-size: 13px; color: #cbd8e4; }
+  .bar-row .bar { flex: 1; height: 18px; background: #16293a; border-radius: 9px; overflow: hidden; }
+  .bar-row .bar .fill { height: 100%; background: #2e6da4; border-radius: 9px; }
+  .bar-row .pct { width: 40px; text-align: right; font-size: 13px; color: #7b93a8; }
+
+  .faq-list { list-style: none; }
+  .faq-list li { padding: 8px 0; border-bottom: 1px dashed #1e3548; }
+  .faq-list li:last-child { border-bottom: none; }
+  .faq-list .q { color: #e8eef5; font-weight: 600; }
+  .faq-list .a { color: #9fb3c8; font-size: 13px; margin-top: 2px; }
+  .faq-list .src { color: #5b7188; font-size: 11px; margin-top: 2px; }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; margin-left: 6px; }
+  .tag.hit { background: #1a7f37; color: #fff; }
+  .tag.miss { background: #c62828; color: #fff; }
+
+  .story-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .story { background: #122a3d; border: 1px solid #1e3548; border-radius: 8px; padding: 12px; }
+  .story .k { font-size: 13px; color: #6ee7b7; font-weight: 600; margin-bottom: 4px; }
+  .story .v { font-size: 12px; color: #cbd8e4; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: #16293a; border: 1px solid #1e3548; border-radius: 12px; padding: 3px 10px; font-size: 12px; color: #9fb3c8; }
+  .hint { font-size: 12px; color: #7b93a8; margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand">AI 工牌 · 演示控制台<small>一线员工 AI agent 助手 · 越用越聪明</small></div>
+  <div class="industry-tabs">
+    <button id="tab-hotel" class="active" onclick="switchIndustry('hotel')">🏨 连锁酒店</button>
+    <button id="tab-dutyfree" onclick="switchIndustry('dutyfree')">🛍 免税店</button>
+    <button id="tab-airport" onclick="switchIndustry('airport')">✈️ 机场</button>
+    <button id="tab-site" onclick="switchIndustry('site')">🏗 工地</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="script-panel">
+    <div class="panel-title">演示脚本 · 起承转合 + 生（点击某步查看话术）</div>
+    <div id="script"></div>
+  </div>
+  <div class="dashboard-panel">
+    <div class="panel-title">后台大屏 · 数据看板</div>
+    <div id="dashboard"></div>
+  </div>
+</div>
+
+<script>
+  var INDUSTRIES = {
+    hotel: {
+      name: '连锁酒店',
+      faqQuestions: ['朝食は何時からですか？', 'タトゥーがあっても入れますか？', '空港への行き方を教えてください。', 'ルームキーを無くしてしまったのですが、どうすればいいですか？', 'チェックアウトは何時ですか？'],
+      brands: ['Booking.com', 'Agoda', '楽天トラベル', 'じゃらん', 'Expedia', 'PayPay', 'Suica'],
+      notice: '台風接近のため、明日は臨時休業いたします（台风接近，明日停业）',
+      langs: [{ name: '中文', pct: 45 }, { name: '英语', pct: 30 }, { name: '韩语', pct: 15 }, { name: '其他', pct: 10 }],
+      story: {
+        eval: '前台小王本月接待 400 位游客、零投诉、推荐成功率 30% —— 谁是优秀员工，数据说话',
+        innov: '后台发现游客高频问「婴儿座椅」→ 公司据此推出「亲子房」套餐',
+        trend: '本季度越南语游客增长 40% → 公司提前招聘越南语店员',
+      },
+      script: [
+        { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：游客说中文「我要办入住」→ 工牌翻成日语', talk: '语言障碍瞬间消失，店员和游客直接对话了' },
+        { step: '承', title: '知识远程支持', value: '总部知识下发一线', demo: '模拟器：店员问「台风退房怎么处理」→ 工牌从总部知识库答', talk: '一线不用再打电话问总部，标准 SOP 就在工牌里' },
+        { step: '转', title: '销售推荐', value: '帮一线卖增值', demo: '模拟器：游客问「有什么好吃的」→ 推荐会席料理 / 部屋食', talk: '还能帮一线推荐增值服务，提升客单价' },
+        { step: '合', title: '团队管理', value: '多语种一键通知', demo: '模拟器：店长发「台风闭店」→ 中日越员工各自母语收到', talk: '多语种团队，一键触达，谁收到谁确认一目了然' },
+        { step: '生', title: '数据闭环', value: '越用越聪明', demo: '看板：今天 500 次交流 → 发现 3 个新问题 → 沉淀 2 条知识', talk: '这不是死工具，是会沉淀公司资产的 AI，越用越懂你的门店' },
+      ],
+    },
+    dutyfree: {
+      name: '免税店',
+      faqQuestions: ['免税の対象になるのは誰ですか？', '消耗品は袋を開けてもいいですか？', 'いくら買えば免税になりますか？', '返品したいんですが、返金してもらえますか？', 'Alipay や WeChat Pay は使えますか？'],
+      brands: ['資生堂', 'Shiseido', 'SK-II', 'KOSE', '雪肌精', 'CPB', '白色恋人', 'Royce', '龙角散'],
+      notice: '本日、新商品が入荷いたしました（今天新品到货）',
+      langs: [{ name: '中文', pct: 55 }, { name: '英语', pct: 20 }, { name: '韩语', pct: 15 }, { name: '泰语', pct: 10 }],
+      story: {
+        eval: '柜员小张本月推荐成功率 35%、客单价提升 20% —— 销售能力量化',
+        innov: '后台发现「龙角散」被问爆 → 公司加大该品备货并推为爆款',
+        trend: '中国大陆游客回暖、免税消费单价上升 → 调整 SKU 结构',
+      },
+      script: [
+        { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：中国游客问「这个能免税吗」→ 工牌翻成日语', talk: '免税店是多语种最集中的场景，翻译是刚需' },
+        { step: '承', title: '知识远程支持', value: '总部知识下发一线', demo: '模拟器：店员问「消耗品退税规则」→ 工牌从知识库答', talk: '退税规则复杂，店员不用记，工牌答' },
+        { step: '转', title: '销售推荐', value: '帮一线卖货', demo: '模拟器：游客问「护肤品推荐」→ 推荐资生堂', talk: '结合品牌词识别，给游客专业推荐' },
+        { step: '合', title: '团队管理', value: '多语种一键通知', demo: '模拟器：店长发「新品到货」→ 员工各自母语收到', talk: '多语种员工，一键通知' },
+        { step: '生', title: '数据闭环', value: '越用越聪明', demo: '看板：高频问「龙角散」→ 系统提示补录知识 → 沉淀为销售话术', talk: '一线卖货数据回流，总部据此调 SKU、定爆款' },
+      ],
+    },
+    airport: {
+      name: '机场',
+      faqQuestions: ['モバイルバッテリーは持ち込めますか？', '乗り継ぎはどうすればいいですか？', '液体物は持ち込めますか？', '忘れ物をしたら？', '市内へはどう行けばいいですか？'],
+      brands: ['ANA', 'JAL', 'T1', 'T2', 'T3'],
+      notice: '登機口が 28 番に変更になりました（登机口变更至 28 号）',
+      langs: [{ name: '中文', pct: 30 }, { name: '英语', pct: 40 }, { name: '韩语', pct: 15 }, { name: '其他', pct: 15 }],
+      story: {
+        eval: '地勤小李本月响应 500 次、投诉 0 —— 服务质量量化',
+        innov: '后台发现「转机咨询」高频 → 优化转机引导牌',
+        trend: '东南亚航线旅客增长 → 增加泰语/越南语地勤',
+      },
+      script: [
+        { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：旅客问「登机口在哪」→ 工牌翻成日语', talk: '机场多语种旅客，翻译是刚需' },
+        { step: '承', title: '知识远程支持', value: '总部知识下发一线', demo: '模拟器：地勤问「充电宝安检规则」→ 工牌答', talk: '安检规则随时更新，工牌同步' },
+        { step: '转', title: '销售推荐', value: '航司增值', demo: '模拟器：旅客问「升舱」→ 推荐贵宾厅/升舱服务', talk: '帮地勤推荐航司增值服务' },
+        { step: '合', title: '团队管理', value: '多语种一键通知', demo: '模拟器：广播「登机口变更」→ 地勤各自母语收到', talk: '多语种地勤，一键触达' },
+        { step: '生', title: '数据闭环', value: '越用越聪明', demo: '看板：高频「转机咨询」→ 提示补录 → 优化引导', talk: '一线数据回流，优化机场服务' },
+      ],
+    },
+    site: {
+      name: '工地',
+      faqQuestions: ['現場に入るときに必ず着けるものは？', '高所で作業するときの注意は？', '給料はいつ支払われますか？', 'ケガをしたらどうすればいいですか？', '在留カードは常に持ち歩かないといけませんか？'],
+      brands: ['安全帽', '安全带', '脚手架'],
+      notice: '台風接近、本日は作業中止（台风接近，今日停工）',
+      langs: [{ name: '越南语', pct: 40 }, { name: '中文', pct: 30 }, { name: '印尼语', pct: 20 }, { name: '其他', pct: 10 }],
+      story: {
+        eval: '班组长小王本月带 50 名劳工、安全零事故 —— 安全管理量化',
+        innov: '后台发现「安全带系法」高频问 → 录制教学视频下发',
+        trend: '越南劳工占比上升 → 增加越南语安全培训',
+      },
+      script: [
+        { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：劳工说越南语「收到」→ 工牌翻成日语', talk: '多国劳工，翻译是安全前提' },
+        { step: '承', title: '知识远程支持', value: '总部知识下发一线', demo: '模拟器：劳工问「安全带怎么系」→ 工牌答', talk: '安全规范下沉到一线，降低事故' },
+        { step: '转', title: '安全提醒', value: '危险预警', demo: '模拟器：系统推送「高空作业注意」→ 劳工母语提醒', talk: '安全提醒，多语种触达' },
+        { step: '合', title: '团队管理', value: '多语种一键调度', demo: '模拟器：班组长发「台风停工」→ 劳工各自母语收到', talk: '多国劳工，一键调度' },
+        { step: '生', title: '数据闭环', value: '越用越聪明', demo: '看板：高频「安全带系法」→ 提示补录 → 沉淀安全培训', talk: '一线安全数据回流，优化安全管理' },
+      ],
+    },
+  };
+
+  var current = 'hotel';
+  var activeStep = 0;
+  var customerId = 1, storeId = 1;
+
+  function switchIndustry(key) {
+    current = key;
+    document.querySelectorAll('.industry-tabs button').forEach(function (b) { b.classList.remove('active'); });
+    document.getElementById('tab-' + key).classList.add('active');
+    activeStep = 0;
+    renderScript();
+    renderDashboard();
+  }
+
+  function renderScript() {
+    var d = INDUSTRIES[current];
+    var steps = d.script.concat([{
+      step: '远', title: '主动与执行（愿景）', value: '从工具到 agent',
+      demo: '愿景：主动提醒「VIP 到店」「补货建议」，帮一线「叫车」「记录投诉」',
+      talk: '翻译机是被动响应，agent 会主动提醒、帮你执行、记住客人——这是公司经营的基础设施'
+    }]);
+    var html = '';
+    steps.forEach(function (s, i) {
+      html += '<div class="step' + (i === activeStep ? ' active' : '') + '" onclick="setStep(' + i + ')">'
+        + '<div class="head"><div class="tag">' + s.step + '</div>'
+        + '<div><div class="title">' + s.title + '</div><div class="value">' + s.value + '</div></div></div>'
+        + '<div class="body"><div class="demo">▶ ' + s.demo + '</div><div class="talk">💬 ' + s.talk + '</div></div>'
+        + '</div>';
+    });
+    document.getElementById('script').innerHTML = html;
+  }
+
+  function setStep(i) { activeStep = i; renderScript(); }
+
+  function renderDashboard() {
+    var d = INDUSTRIES[current];
+    var langHtml = '';
+    d.langs.forEach(function (l) {
+      langHtml += '<div class="bar-row"><span class="lbl">' + l.name + '</span>'
+        + '<div class="bar"><div class="fill" style="width:' + l.pct + '%"></div></div>'
+        + '<span class="pct">' + l.pct + '%</span></div>';
+    });
+    var chipsHtml = '';
+    d.brands.forEach(function (b) { chipsHtml += '<span class="chip">' + b + '</span>'; });
+
+    document.getElementById('dashboard').innerHTML =
+      '<div class="card"><h3>👥 今日游客语言分布</h3>' + langHtml + '</div>'
+      + '<div class="card"><h3>📚 高频问答（实时调知识库检索）</h3><ul class="faq-list" id="faq-list">'
+      + '<li class="hint">检索中…</li></ul></div>'
+      + '<div class="card"><h3>📢 通知样例</h3><div style="color:#cbd8e4;">' + d.notice + '</div></div>'
+      + '<div class="card"><h3>🏷 品牌词识别</h3><div class="chips">' + chipsHtml + '</div>'
+      + '<div class="hint">游客说这些品牌词时，工牌识别并保留原词，不误翻</div></div>'
+      + '<div class="card"><h3>📊 数据驱动的经营（三件事）</h3><div class="story-grid">'
+      + '<div class="story"><div class="k">📋 员工考评</div><div class="v">' + d.story.eval + '</div></div>'
+      + '<div class="story"><div class="k">💡 产品创新</div><div class="v">' + d.story.innov + '</div></div>'
+      + '<div class="story"><div class="k">📈 市场趋势</div><div class="v">' + d.story.trend + '</div></div>'
+      + '</div></div>'
+      + '<div class="card"><h3>🤖 这是 agent，不只是翻译机（愿景）</h3><div class="story-grid">'
+      + '<div class="story"><div class="k">🎯 主动</div><div class="v">合适时机主动提醒：VIP 到店、补货建议、台风预警</div></div>'
+      + '<div class="story"><div class="k">⚡ 执行</div><div class="v">连公司系统，真的帮一线做事：叫车、写工单、发留言</div></div>'
+      + '<div class="story"><div class="k">💬 对话</div><div class="v">多轮追问澄清，不是一问一答</div></div>'
+      + '<div class="story"><div class="k">🧠 记忆</div><div class="v">记住客人偏好、员工情况</div></div>'
+      + '</div></div>';
+    loadFaqAnswers(d);
+  }
+
+  function loadFaqAnswers(d) {
+    var list = document.getElementById('faq-list');
+    var promises = d.faqQuestions.map(function (q) {
+      return fetch('/api/skb/answer?question=' + encodeURIComponent(q)
+        + '&domain=vkb&customerId=' + customerId + '&storeId=' + storeId)
+        .then(function (r) { return r.json(); })
+        .then(function (res) { return { q: q, res: res }; })
+        .catch(function () { return { q: q, res: { status: 'error' } }; });
+    });
+    Promise.all(promises).then(function (results) {
+      var html = '';
+      results.forEach(function (r) {
+        var hit = r.res.status === 'ok';
+        var tag = hit ? '<span class="tag hit">命中</span>' : '<span class="tag miss">未命中</span>';
+        var answer = hit ? escapeHtml(r.res.answer) : '（未命中）';
+        var src = hit && r.res.source_refs && r.res.source_refs.length
+          ? '<div class="src">来源：' + escapeHtml(r.res.source_refs[0]) + '</div>' : '';
+        html += '<li><div class="q">' + escapeHtml(r.q) + tag + '</div>'
+          + '<div class="a">' + answer + '</div>' + src + '</li>';
+      });
+      list.innerHTML = html;
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  renderScript();
+  renderDashboard();
+</script>
+</body>
+</html>

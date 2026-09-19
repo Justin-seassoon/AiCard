@@ -18,6 +18,7 @@ import com.aicard.skb.service.SkbService;
 import com.aicard.translation.audio.BeepAudio;
 import com.aicard.translation.orchestrate.TranslationOrchestrator;
 import com.aicard.translation.orchestrate.TranslationResult;
+import com.aicard.translation.qualify.QualifyTermService;
 import com.aicard.translation.qualify.UtteranceQualifier;
 import com.aicard.translation.qualify.UtteranceQuality;
 import com.aicard.translation.state.TranslationSessionState;
@@ -29,6 +30,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -55,6 +57,7 @@ public class TranslationHandlerImpl implements TranslationHandler {
     private final SkbService skbService;
     private final LLMProvider llm;
     private final UtteranceQualifier qualifier;
+    private final QualifyTermService terms;
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     private final Map<String, TranslationSessionState> states = new ConcurrentHashMap<>();
@@ -70,13 +73,14 @@ public class TranslationHandlerImpl implements TranslationHandler {
 
     public TranslationHandlerImpl(TranslationOrchestrator orchestrator, SpeechProvider speech,
                                   IngestionService ingestion, SkbService skbService, LLMProvider llm,
-                                  UtteranceQualifier qualifier) {
+                                  UtteranceQualifier qualifier, QualifyTermService terms) {
         this.orchestrator = orchestrator;
         this.speech = speech;
         this.ingestion = ingestion;
         this.skbService = skbService;
         this.llm = llm;
         this.qualifier = qualifier;
+        this.terms = terms;
     }
 
     @Override
@@ -163,7 +167,10 @@ public class TranslationHandlerImpl implements TranslationHandler {
             byte[] originalTts = extractTts(turnId);
             String visitor = result.detectedLanguage() != null && !result.detectedLanguage().isBlank()
                     ? result.detectedLanguage() : "UNKNOWN";
-            UtteranceQuality quality = qualifier.qualify(result.finalText(), msg.utteranceDurationMs());
+            Set<String> whitelist = terms.getWhitelist(ctx.customerId(), ctx.storeId());
+            Set<String> brandTerms = terms.getBrandTerms(ctx.customerId(), ctx.storeId());
+            UtteranceQuality quality = qualifier.qualify(result.finalText(), msg.utteranceDurationMs(),
+                    whitelist, brandTerms);
             // visitor_language 仅用于员工(wearer)方向的翻译目标语言；游客方向走一步 auto-detect 不读记忆。
             // 已知局限（联调后评估防漂移）：换游客不重置记忆、同一游客夹杂语言时员工方向会漂移。
             if (!"UNKNOWN".equals(visitor) && quality == UtteranceQuality.NORMAL) {

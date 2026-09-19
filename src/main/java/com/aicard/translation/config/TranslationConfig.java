@@ -11,10 +11,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-import java.util.Arrays;
-import java.util.Set;
-import java.util.stream.Collectors;
-
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
@@ -60,22 +56,8 @@ public class TranslationConfig {
     @Bean
     public UtteranceQualifier utteranceQualifier(
             @Value("${translation.qualify.min-utt-duration-ms:200}") long minDurationMs,
-            @Value("${translation.qualify.numeric-filter:true}") boolean numericFilter,
-            @Value("${translation.qualify.whitelist:}") String whitelistCsv,
-            @Value("${translation.qualify.brand-terms:}") String brandTermsCsv) {
-        return new UtteranceQualifier(minDurationMs, numericFilter,
-                splitLowerCsv(whitelistCsv), splitLowerCsv(brandTermsCsv));
-    }
-
-    private static Set<String> splitLowerCsv(String csv) {
-        if (csv == null || csv.isBlank()) {
-            return Set.of();
-        }
-        return Arrays.stream(csv.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .map(String::toLowerCase)
-                .collect(Collectors.toSet());
+            @Value("${translation.qualify.numeric-filter:true}") boolean numericFilter) {
+        return new UtteranceQualifier(minDurationMs, numericFilter);
     }
 
     private static byte[] beep() {

@@ -49,6 +49,8 @@
   .log .sys { color: #a5b4c4; }
 
   .vkb-hint { background: #fff8e1; border: 1px solid #ffd54f; border-radius: 8px; padding: 10px 12px; color: #8a6d00; font-size: 13px; display: none; }
+
+  .broadcast-msg { background: #f0f4f8; border: 1px solid #c9d4de; border-radius: 8px; padding: 14px; font-size: 18px; font-weight: 700; color: #0f2a4a; min-height: 52px; word-break: break-all; }
 </style>
 </head>
 <body>
@@ -61,6 +63,12 @@
     <div class="row">
       <label>Host</label>
       <input type="text" id="host" placeholder="留空则用当前地址（https 自动走 wss）" style="max-width:240px;">
+      <label>设备</label>
+      <select id="deviceSelect" onchange="selectDevice()" style="max-width:170px;">
+        <option value="demo-device-001" selected>demo-device-001（日语）</option>
+        <option value="test-dev-002">test-dev-002（日语）</option>
+        <option value="dev-vi-001">dev-vi-001（越南语）</option>
+      </select>
       <label>device_id</label>
       <input type="text" id="deviceId" value="demo-device-001" style="max-width:150px;">
       <label>token</label>
@@ -105,6 +113,32 @@
     <div class="vkb-hint" id="vkb-hint">🔔 VKB 命中提示音已播放，若游客问题撞知识库，请点「OK」让答案反向翻译播放。</div>
   </div>
 
+  <!-- 广播 -->
+  <div class="card">
+    <div class="row"><label style="font-weight:700;">📢 分组广播（管理员发 / 设备收）</label></div>
+    <div class="row">
+      <label>群 ID</label>
+      <input type="text" id="bc-group" value="1" style="max-width:70px;">
+      <label>源语言</label>
+      <select id="bc-lang">
+        <option value="ja-JP" selected>ja-JP（日语）</option>
+        <option value="zh-CN">zh-CN（中文）</option>
+        <option value="en-US">en-US（英语）</option>
+        <option value="vi-VN">vi-VN（越南语）</option>
+        <option value="ko-KR">ko-KR（韩语）</option>
+      </select>
+    </div>
+    <div class="row">
+      <input type="text" id="bc-text" placeholder="广播内容，如：安全须知，请佩戴安全帽" style="flex:1;">
+      <button class="btn-primary" onclick="sendBroadcast()">发送广播</button>
+    </div>
+    <div class="row" style="margin-top:8px;"><label>本机收到的广播（墨水屏模拟）</label></div>
+    <div class="broadcast-msg" id="bc-msg">— 暂无 —</div>
+    <div class="row" style="margin-top:8px;">
+      <button class="btn-ok" id="btn-bc-ack" onclick="sendBroadcastAck()" disabled style="flex:1;">✅ 确认收到（回执）</button>
+    </div>
+  </div>
+
   <!-- 状态 -->
   <div class="card">
     <div class="status-row">
@@ -140,8 +174,13 @@
   var talkStartMs = 0;
 
   // TTS 播放累积
-  var ttsChunks = [];        // 剥头后的 Int16 PCM 字节
+  var ttsChunks = {};        // turnId → 剥头后的 Int16 PCM 分片数组（按 turn 隔离，避免广播/翻译交错）
+  var playQueue = [];        // TTS 播放队列（逐条播放，避免广播/翻译音频重叠或打断产生杂音）
+  var playing = false;
   var currentTtsTurn = null;
+
+  // 广播
+  var currentBroadcastId = null;
 
   var $ = function (id) { return document.getElementById(id); };
   var logEl = $('log');
@@ -162,6 +201,12 @@
   }
 
   // ===== 连接 =====
+  function selectDevice() {
+    var v = $('deviceSelect').value;
+    $('deviceId').value = v;
+    $('token').value = 'demo-token-001';
+  }
+
   function connect() {
     var host = $('host').value.trim() || location.host;
     var scheme = location.protocol === 'https:' ? 'wss://' : 'ws://';
@@ -379,9 +424,13 @@
   function handleJson(msg) {
     switch (msg.type) {
       case 'tts_end':
-        log('tts_end → 开始播放（' + (ttsChunks.length * 2) + ' 字节 PCM）', 'in');
-        playTts(ttsChunks);
-        ttsChunks = [];
+        var endTurn = msg.turn_id;
+        var endChunks = ttsChunks[endTurn] || [];
+        if (endChunks.length) {
+          log('tts_end → 播放 turn=' + endTurn + '（' + endChunks.length + ' 片）', 'in');
+          playTts(endChunks);
+        }
+        delete ttsChunks[endTurn];
         break;
       case 'language_state':
         $('st-lang').textContent = msg.visitor_language || 'UNKNOWN';
@@ -389,10 +438,16 @@
         break;
       case 'error':
         log('错误 code=' + msg.code + ' message=' + (msg.message || ''), 'err');
-        ttsChunks = [];
+        ttsChunks = {};
         break;
       case 'answer':
         log('知识库答案：' + (msg.text || ''), 'sys');
+        break;
+      case 'broadcast':
+        currentBroadcastId = msg.broadcast_id;
+        $('bc-msg').textContent = msg.text || '';
+        $('btn-bc-ack').disabled = false;
+        log('📢 收到广播 #' + msg.broadcast_id + '（' + (msg.target_language || '') + '）：' + (msg.text || ''), 'sys');
         break;
       default:
         break;
@@ -410,7 +465,8 @@
       var audio = new Uint8Array(data, 2 + turnIdLen);
       log('↓ TTS 帧 turn=' + turnId.slice(0, 8) + ' ' + audio.length + ' 字节', 'in');
       var pcm = stripWavHeader(audio);
-      ttsChunks.push(pcm);
+      if (!ttsChunks[turnId]) ttsChunks[turnId] = [];
+      ttsChunks[turnId].push(pcm);
       $('vkb-hint').style.display = 'block'; // 收到 beep 时提示可能撞 VKB
     } else {
       log('未知二进制帧 frame_type=0x' + frameType.toString(16), 'err');
@@ -418,7 +474,7 @@
   }
 
   function stripWavHeader(bytes) {
-    // 若带 RIFF/WAVE 头（44 字节），剥掉；否则原样返回
+    // 下行 TTS 带 44 字节 WAV 头（RIFF），剥掉；否则原样返回
     if (bytes.length > 44 &&
         bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
       return bytes.slice(44);
@@ -438,11 +494,24 @@
     var int16 = new Int16Array(merged.buffer);
     var float32 = new Float32Array(int16.length);
     for (var i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768;
+    // 入队逐条播放：不打断正在播的音频，避免重叠/打断产生杂音
+    playQueue.push(float32);
+    drainQueue();
+  }
+
+  function drainQueue() {
+    if (playing || playQueue.length === 0) return;
+    playing = true;
+    var float32 = playQueue.shift();
     var buffer = audioCtx.createBuffer(1, float32.length, 16000);
     buffer.getChannelData(0).set(float32);
     var src = audioCtx.createBufferSource();
     src.buffer = buffer;
     src.connect(audioCtx.destination);
+    src.onended = function () {
+      playing = false;
+      drainQueue(); // 播完自动播下一条
+    };
     src.start();
     log('播放完成 ' + (float32.length / 16000).toFixed(2) + ' 秒', 'sys');
   }
@@ -457,7 +526,31 @@
   function sendStopTts() {
     if (!connected || !currentTurnId) return;
     sendJson({ type: 'stop_tts', session_id: sessionId, turn_id: currentTurnId, reason: 'button' });
-    ttsChunks = [];
+    ttsChunks = {};
+    playQueue = [];  // 打断时清空待播队列，避免残留音频继续播
+    playing = false;
+  }
+
+  // ===== 广播 =====
+  function sendBroadcast() {
+    var groupId = $('bc-group').value;
+    var lang = $('bc-lang').value;
+    var text = $('bc-text').value;
+    if (!text) { log('请先输入广播内容', 'err'); return; }
+    fetch('/api/groups/' + groupId + '/broadcasts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Customer-Id': '1', 'X-Store-Id': '1' },
+      body: JSON.stringify({ source_text: text, source_language: lang })
+    }).then(function (r) { return r.json(); })
+      .then(function (j) { log('✅ 广播已发送 #' + j.id + '：' + j.source_text, 'sys'); })
+      .catch(function (e) { log('发广播失败：' + e.message, 'err'); });
+  }
+
+  function sendBroadcastAck() {
+    if (!connected || !currentBroadcastId) return;
+    sendJson({ type: 'broadcast_ack', session_id: sessionId, broadcast_id: currentBroadcastId });
+    log('✅ 已回执广播 #' + currentBroadcastId, 'sys');
+    $('btn-bc-ack').disabled = true;
   }
 </script>
 </body>

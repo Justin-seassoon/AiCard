@@ -11,7 +11,7 @@ import java.util.Map;
  * 见《端云通信接口规范》§4。
  *
  * 消息 type：tts_end | error | final_text | partial_text | answer |
- *            language_state | config_update | output_route
+ *            language_state | config_update | output_route | broadcast
  */
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -35,5 +35,8 @@ public record OutboundMessage(
         Integer configVersion,
         Map<String, Object> config,
         // output_route
-        String route
+        String route,
+        // broadcast
+        Long broadcastId,
+        String targetLanguage
 ) {}

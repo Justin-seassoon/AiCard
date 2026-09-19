@@ -1,5 +1,6 @@
 package com.aicard.gateway.handler;
 
+import com.aicard.broadcast.service.BroadcastService;
 import com.aicard.common.domain.Device;
 import com.aicard.common.tenant.Tenant;
 import com.aicard.common.tenant.TenantContext;
@@ -11,6 +12,7 @@ import com.aicard.gateway.protocol.OutboundMessage;
 import com.aicard.gateway.protocol.TtsAudioFrame;
 import com.aicard.gateway.session.SessionContext;
 import com.aicard.gateway.session.SessionManager;
+import com.aicard.gateway.state.DeviceConnectionRegistry;
 import com.aicard.gateway.state.DeviceStateTracker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
@@ -39,13 +41,18 @@ public class GatewayTransportHandler extends AbstractWebSocketHandler {
     private final SessionManager sessions;
     private final GatewayWebSocketHandler router;
     private final DeviceStateTracker states;
+    private final DeviceConnectionRegistry connections;
+    private final BroadcastService broadcasts;
 
     public GatewayTransportHandler(ObjectMapper mapper, SessionManager sessions,
-                                   GatewayWebSocketHandler router, DeviceStateTracker states) {
+                                   GatewayWebSocketHandler router, DeviceStateTracker states,
+                                   DeviceConnectionRegistry connections, BroadcastService broadcasts) {
         this.mapper = mapper;
         this.sessions = sessions;
         this.router = router;
         this.states = states;
+        this.connections = connections;
+        this.broadcasts = broadcasts;
     }
 
     @Override
@@ -53,6 +60,7 @@ public class GatewayTransportHandler extends AbstractWebSocketHandler {
         Device device = (Device) session.getAttributes().get(GatewayHandshakeInterceptor.ATTR_DEVICE);
         if (device != null) {
             states.markOnline(device.getDeviceId());
+            connections.register(device.getDeviceId(), session);
         }
     }
 
@@ -92,6 +100,7 @@ public class GatewayTransportHandler extends AbstractWebSocketHandler {
         if (ctx != null) {
             sessions.remove(ctx.sessionId());
             states.markSleep(ctx.deviceId());
+            connections.unregister(ctx.deviceId());
         }
     }
 
@@ -110,6 +119,7 @@ public class GatewayTransportHandler extends AbstractWebSocketHandler {
         ctx.langPair(msg.langPair() != null ? msg.langPair() : "zh-ja");
         session.getAttributes().put(ATTR_SESSION, ctx);
         states.markOnline(device.getDeviceId());
+        broadcasts.deliverPending(device.getDeviceId());
     }
 
     private SessionContext requireSession(WebSocketSession session) {
