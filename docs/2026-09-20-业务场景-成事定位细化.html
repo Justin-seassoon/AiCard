@@ -1,0 +1,78 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>AI 工牌 · 行业业务场景细化（成事定位版）</title><style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.6; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 18pt; font-weight: 700;
+       text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 14pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+h3 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 12pt; font-weight: 700;
+       color: #1a3c6e; margin: 12pt 0 4pt; }
+p { margin: 3pt 0; }
+blockquote { margin: 6pt 0; padding: 6pt 10pt; background: #f4f7fb; border-left: 3px solid #2b6cb0; color: #333; }
+ul, ol { margin: 4pt 0; padding-left: 0; list-style: none; }
+li { margin: 0 0 4pt; padding-left: 12pt; text-indent: -12pt; }
+li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+ol { counter-reset: item; }
+ol li { counter-increment: item; }
+ol li::before { content: counter(item) '. '; color: #2b6cb0; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 5pt 0 10pt; font-size: 9pt; }
+th, td { border: 1px solid #b9c4d4; padding: 4pt 7pt; vertical-align: top; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+code { font-family: 'Menlo', 'Monaco', monospace; background: #f0f2f5; padding: 0 3px; border-radius: 3px; font-size: 9.5pt; }
+hr { border: none; border-top: 1px solid #e0e5ec; margin: 12pt 0; }
+b { font-weight: 700; }
+</style></head><body><div class='doctitle'>AI 工牌 · 行业业务场景细化（成事定位版）</div>
+<div class='subtitle'>日期：2026-09-20<br>背景：结合《李开复「老板AI」vs 德国面包店撤检查表》一文的核心洞察——<b>监控本身无对错，有对错的是「防人」还是「成事」</b>。德国 145 家门店烘焙连锁撤掉两张「被羞辱的检查表」后销售额涨 2.7%、店长流失下降；李开复的「老板AI」因无死角监控而遭中层抗拒。本文据此重构 10 个演示场景的叙事口径。<br>目标：打动<b>企业客户</b>（帮一线把事做成、守住红线、可量化 ROI）+ <b>投资人</b>（壁垒、可复制、越用越聪明）。</div>
+<hr>
+<h2>一、一句话定位升级</h2>
+<ul><li><b>原口径</b>：AI 工牌 = 一线员工的 agent 助手（翻译入口 + 数据采集/知识支持/销售推荐/团队管理）</li><li><b>升级口径</b>：AI 工牌 = <b>帮一线把事做成</b>的经营末梢 agent。翻译/知识/推荐是「赋能」，安全/合规/卫生是「守住红线」，数据回流是「让一线越用越强」。<b>它不是监控员工的工具。</b></li></ul>
+<p><b>核心原则（摘自文章，作为产品红线）</b>：</p>
+<blockquote>拆掉「被羞辱的表」（监控/防人），留下「能协调的表」（成事/赋能）。管理留 1–3 条谁都碰不得的红线，就够了。</blockquote>
+<hr>
+<h2>二、五条「成事」设计原则（文章 → 产品映射）</h2>
+<table><thead><tr><th>#</th><th>文章洞察</th><th>映射到工牌</th></tr></thead><tbody><tr><td>1</td><td>朝「防人」用是监控，朝「成事」用才是工具</td><td>每个功能上线前自问：<b>帮一线把事做好，还是证明总部不放心一线</b></td></tr><tr><td>2</td><td>拆掉被羞辱的，留下能协调的</td><td>做：翻译/知识/推荐/调度（协调）；不做：实时定位、暗中录音、盯摸鱼、承诺账簿式盯人</td></tr><tr><td>3</td><td>AI 授权但判断人来做，冲突时给证据链</td><td>知识库答案带 <code>source_refs</code>（来源）；主动提醒是「提示+依据」，决定留给一线</td></tr><tr><td>4</td><td>红线留 1–3 条，别把事搞砸</td><td>安全须知/签证合规/食品卫生/农药台账 = 红线，工牌帮忙守住</td></tr><tr><td>5</td><td>中层最抗拒 AI，因为老板绕过他们看一线</td><td>把店长/班组长做成<b>受益者</b>（帮调度/派工/看回执），不做成被绕过的对象</td></tr></tbody></table>
+<hr>
+<h2>三、四维度重构（防人 → 成事）</h2>
+<table><thead><tr><th>维度</th><th>原口径（有防人风险）</th><th>成事口径（本版）</th><th>红线边界（不做）</th></tr></thead><tbody><tr><td>数据采集</td><td>采集员工言行 → 考评/监控</td><td>采集高频问题→补知识；采集需求→推新品；采集风险→预警</td><td>不采集「谁偷懒/谁说错话」用于惩罚</td></tr><tr><td>知识支持</td><td>总部知识下发一线</td><td>总部替一线记住答案（带来源=证据链，判断留给一线）</td><td>不替代一线判断</td></tr><tr><td>销售推荐</td><td>一线卖增值</td><td>帮一线卖货（给依据，不逼单）</td><td>不伪造推荐、不误导</td></tr><tr><td>团队管理</td><td>多语种通知/调度</td><td>帮班组长协调（调度/派工/回执）</td><td>不做「承诺账簿」式盯人</td></tr></tbody></table>
+<blockquote><b>一句话</b>：采集是为了「下次答得更好」，不是为了「抓谁偷懒」。</blockquote>
+<hr>
+<h2>四、10 个场景逐项细化</h2>
+<blockquote>每项 = 「帮一线成什么事（赋能）」+「守住哪条红线」+「客户看到的 ROI」+「一句话话术」。</blockquote>
+<h3>4.1 连锁酒店</h3>
+<ul><li><b>帮事（赋能）</b>：翻译（零障碍）、知识（SOP 即时答）、推荐（卖会席/部屋食→客单价↑）、VIP 到店提醒（别怠慢）</li><li><b>红线</b>：投诉处理规范、涉外旅客登记合规</li><li><b>客户 ROI</b>：客单价↑（推荐）、投诉↓（答得对）、培训成本↓（不用背 SOP）</li><li><b>话术</b>：「前台不用再打电话问总部，标准答案就在工牌里；还能顺手帮客人推荐晚餐，客单价上去了，投诉下来了。」</li></ul>
+<h3>4.2 免税店</h3>
+<ul><li><b>帮事</b>：翻译 + 品牌词识别（龙角散/资生堂不误翻）、爆款推荐（卖货）、退税规则即时答</li><li><b>红线</b>：免税手续合规（别被国税厅罚）</li><li><b>客户 ROI</b>：客单价↑、爆款备货精准、退税差错↓</li><li><b>话术</b>：「游客问『护肤品推荐』，工牌直接给专业答案，还识别出品牌词不翻错——高客单的每一单都多卖一点。」</li></ul>
+<h3>4.3 机场</h3>
+<ul><li><b>帮事</b>：翻译、安检规则即时答、登机口变更多语种广播</li><li><b>红线</b>：安检合规、无障碍服务</li><li><b>客户 ROI</b>：服务效率↑、投诉↓（机场是信任标杆场景）</li><li><b>话术</b>：「机场是多语种最集中的地方，工牌把安检规则、登机口变更实时送到旅客耳边，地勤不用背、旅客不抓瞎。」</li></ul>
+<h3>4.4 工地</h3>
+<ul><li><b>帮事</b>：安全翻译（指令不失真）、安全知识即时答、台风停工母语广播</li><li><b>红线</b>：安全规范（别出人命）、在留合规</li><li><b>客户 ROI</b>：<b>事故↓（最硬 ROI，人命关天）</b>、培训成本↓</li><li><b>话术</b>：「劳工说『收到』，工牌确保他真的听懂『高空作业要系安全带』——安全指令多语种不失真，就是少出一次事故。」</li></ul>
+<h3>4.5 劳务派遣（管理方）</h3>
+<ul><li><b>帮事</b>：劳工↔管理者翻译、岗前/安全/技能培训下沉、派工/停工广播、在留到期提醒</li><li><b>红线</b>：技能实习/特定技能合规、工时记录</li><li><b>客户 ROI</b>：到岗率↑、培训成本↓、合规风险↓</li><li><b>话术</b>：「一个派遣公司管 5 个行业、上百名劳工，工牌把培训、派工、合规到期一次性管起来，管理员不用一个个打电话。」</li></ul>
+<h3>4.6 制造</h3>
+<ul><li><b>帮事</b>：操作规范/5S 即时答、设备点检提醒、报不良工单</li><li><b>红线</b>：机械/化学品安全、品质要求</li><li><b>客户 ROI</b>：不良率↓、事故↓</li><li><b>话术</b>：「劳工问『进车间穿什么』『紧急停止什么时候按』，工牌即时答，不良品和事故一起降下来。」</li></ul>
+<h3>4.7 餐饮</h3>
+<ul><li><b>帮事</b>：接客用语、卫生规范即时答、诺如/食中毒高发预警</li><li><b>红线</b>：食品卫生（过敏原 8 品目）、诺如防控</li><li><b>客户 ROI</b>：卫生检查零扣分、投诉↓、食品安全事故↓</li><li><b>话术</b>：「生熟分开、什么时候洗手、客人过敏怎么办——工牌把厚労省的规矩翻译成劳工能懂的母语，卫生检查零扣分。」</li></ul>
+<h3>4.8 农业</h3>
+<ul><li><b>帮事</b>：农药/机械安全即时答、高温预警、农药台账</li><li><b>红线</b>：农药安全间隔、GAP 认证合规</li><li><b>客户 ROI</b>：事故↓、GAP 认证通过（出口刚需）</li><li><b>话术</b>：「农药配比、安全间隔、收获标准，工牌现场答；GAP 认证要的台账，工牌顺手记好。」</li></ul>
+<h3>4.9 介护</h3>
+<ul><li><b>帮事</b>：照护规范即时答、定时翻身/服药提醒、护理日志</li><li><b>红线</b>：照护伦理、用药安全（病史属「要配虑个人情报」，合规最严）</li><li><b>客户 ROI</b>：照护事故↓、家属好评↑（老龄化超级赛道，付费意愿最强）</li><li><b>话术</b>：「老人几点该翻身、几点该服药，工牌准时提醒；照护规范现场答——介护员安心，家属放心。」</li></ul>
+<h3>4.10 清扫</h3>
+<ul><li><b>帮事</b>：清洁标准/化学品安全即时答、检查临近提醒、失物上报</li><li><b>红线</b>：化学品安全、客户隐私（不碰客人物品）</li><li><b>客户 ROI</b>：检查合格率↑、投诉↓</li><li><b>话术</b>：「抹布怎么分色、化学品能不能混、客人物品能不能碰——工牌现场答，检查合格率上去了，客户投诉下来了。」</li></ul>
+<hr>
+<h2>五、两套话术（对客户 / 对投资人）</h2>
+<h3>5.1 对客户（企业主 / 店长 / 派遣方）</h3>
+<table><thead><tr><th>对象</th><th>工牌给 TA 什么</th><th>潜台词</th></tr></thead><tbody><tr><td>一线员工</td><td>帮你干活（翻译/答对/提醒/别出事）</td><td>不是盯着你</td></tr><tr><td>店长/班组长</td><td>帮你调度/派工/看回执</td><td>不是总部绕过你监控一线</td></tr><tr><td>老板</td><td>守住「别搞砸」的红线 + 把「把事做成」的能力下沉一线</td><td>客单价↑、事故↓、投诉↓、培训成本↓</td></tr></tbody></table>
+<h3>5.2 对投资人</h3>
+<ol><li><b>不是「又一台翻译机」</b>，是「一线经营末梢的 AI agent」——翻译只是入口，价值在知识/推荐/广播/数据闭环。</li><li><b>壁垒 = 数据闭环</b>：一线交互 → 补知识 → 下次答得更好 → 越用越强，形成「换掉我就丢数据」的迁移成本。</li><li><b>可复制 = 一套能力 × 10 场景模板</b>：翻译/知识/推荐/广播是通用能力，行业差异做成模板（酒店→免税→机场→劳务派遣 5 细分），横向扩张边际成本极低。</li><li><b>四层租户隔离</b>：天然 SaaS 化，一个客户一套数据，可规模化交付。</li><li><b>对标</b>：德国面包店证明「去掉不信任→涨 2.7%」；我们证明「赋能一线→客单价/事故率/培训成本三降三升」——这是可被随机对照试验验证的价值，不是讲故事。</li></ol>
+<hr>
+<h2>六、落地提醒（哪些坚决不做）</h2>
+<blockquote>文章最狠的一句：「你得到的是升级版的阳奉阴违——员工用 AI 对付老板，老板用 AI 对付员工，两边都很聪明，事却还是没做成。」</blockquote>
+<p>为避免重蹈「老板AI」覆辙，产品坚决不做：</p>
+<ul><li>❌ 实时定位追踪员工</li><li>❌ 暗中录音分析「谁说了什么」</li><li>❌ 「谁偷懒/谁摸鱼」式考勤监控</li><li>❌ 「谁答应了没做到」式承诺账簿</li><li>❌ 绕过店长/班组长直接向总部汇报一线言行</li></ul>
+<p><b>做</b>：帮一线成事的赋能（翻译/知识/推荐）、守住红线的提醒（安全/合规/卫生）、帮中层协调的广播（调度/派工/回执）。</p>
+<hr>
+<h2>附：四维度「成事口径」速查</h2>
+<table><thead><tr><th>维度</th><th>一句话</th></tr></thead><tbody><tr><td>翻译</td><td>让一线和客人/劳工直接对话，指令不失真</td></tr><tr><td>知识</td><td>总部替一线记住答案（带来源），判断留给一线</td></tr><tr><td>推荐</td><td>帮一线卖货（给依据），不逼单</td></tr><tr><td>广播/调度</td><td>帮班组长协调（派工/停工/回执），不监控</td></tr><tr><td>数据闭环</td><td>采集是为了下次答得更好，不是为了抓谁偷懒</td></tr></tbody></table></body></html>

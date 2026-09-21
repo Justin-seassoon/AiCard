@@ -1,0 +1,55 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>关于《远景功能落地方案补充整理》的两点回复</title><style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.6; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 18pt; font-weight: 700;
+       text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 14pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+h3 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 12pt; font-weight: 700;
+       color: #1a3c6e; margin: 12pt 0 4pt; }
+p { margin: 3pt 0; }
+blockquote { margin: 6pt 0; padding: 6pt 10pt; background: #f4f7fb; border-left: 3px solid #2b6cb0; color: #333; }
+ul, ol { margin: 4pt 0; padding-left: 0; list-style: none; }
+li { margin: 0 0 4pt; padding-left: 12pt; text-indent: -12pt; }
+li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+ol { counter-reset: item; }
+ol li { counter-increment: item; }
+ol li::before { content: counter(item) '. '; color: #2b6cb0; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 5pt 0 10pt; font-size: 9pt; }
+th, td { border: 1px solid #b9c4d4; padding: 4pt 7pt; vertical-align: top; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+code { font-family: 'Menlo', 'Monaco', monospace; background: #f0f2f5; padding: 0 3px; border-radius: 3px; font-size: 9.5pt; }
+hr { border: none; border-top: 1px solid #e0e5ec; margin: 12pt 0; }
+b { font-weight: 700; }
+</style></head><body><div class='doctitle'>关于《远景功能落地方案补充整理》的两点回复</div>
+<div class='subtitle'>致：测试、需求同事<br>日期：2026-09-21<br>范围：针对《远景功能落地方案补充整理.docx》<b>第 6 条（劳务派遣考勤）</b>、<b>第 8 条（介护老人陪伴设备）</b> 的结论回复</div>
+<hr>
+<h2>一、劳务派遣「考勤」——采纳，但 1.0 只做「到岗登记」</h2>
+<h3>你们的建议（要点回顾）</h3>
+<p>考勤入口需重新定义：员工如何打卡、是否要定位、是否要防代打卡、项目切换、休息/加班、考勤数据去向、是否对接考勤系统等。</p>
+<h3>结论：建议成立，采纳；但 1.0 范围收缩为「到岗登记」</h3>
+<p>同意「考勤入口需要重新设计」的判断。但其中「<b>定位、防代打卡</b>」这两项，1.0 <b>不做</b>，原因如下：</p>
+<p><b>定位 + 防代打卡 = 纯监控（防人），与产品定位冲突。</b></p>
+<p>我们的产品定位是「帮一线把事做成的 agent，<b>不是监控员工的工具</b>」（这是近期已对齐的核心口径）。定位追踪、防代打卡本质是「证明员工没偷懒 / 没代打卡」，属于「防人」而非「成事」。一旦做进 1.0，会：</p>
+<ol><li>引发一线员工与中层（店长 / 班组长）的抵触，导致「阳奉阴违」——员工把聪明用在躲检查上，而不是把事做好；</li><li>与日本 APPI 下「位置信息」等敏感数据叠加，合规成本陡增；</li><li>稀释 1.0 的核心价值焦点。</li></ol>
+<h3>1.0 怎么做（最小范围）</h3>
+<p>考勤在 1.0 只做「<b>到岗 / 离岗登记</b>」这一个动作，且<b>尽量复用现有交互，不新增硬件、不新增定位</b>：</p>
+<ul><li>员工通过工牌按键（方向键 + 确认键菜单，或语音）做一次「到岗确认」；</li><li>到岗登记作为「主动提醒 → 执行 → 回执」闭环的<b>副产品</b>：例如派工 / 任务下发后，员工确认收到 / 完成即自动记为到岗；</li><li>数据回流到后台看板（到岗率、出勤统计），供管理者「<b>看清一线</b>」而非「<b>盯住一线</b>」。</li></ul>
+<h3>延后到 2.0 单独评估</h3>
+<p>定位、防代打卡、考勤系统对接、复杂规则（项目切换 / 休息 / 加班 / 工时合规）——这些涉及合规与「防人」权衡，留到 1.0 稳定后单独立项评估。</p>
+<hr>
+<h2>二、介护「老人陪伴设备」——单独立项，1.0 不混入</h2>
+<h3>你们的建议（要点回顾）</h3>
+<p>介护场景可从「员工工具」扩展到「老人本人使用」：主动提醒（吃药 / 康复）、AI 陪伴、呼叫介护人员，形成「老人 → 设备 → 介护人员」链路。你们也指出这已不是 B2B 员工工牌，而是 <b>B2B2C 养老 AI 终端</b>，需单独做定位 / 权限 / 隐私 / 紧急呼叫 / 数据保存设计。</p>
+<h3>结论：方向认可，单独立项；1.0 不混入</h3>
+<p>这个方向（老龄化 + 陪伴 + 主动提醒）是<b>真实且有价值的赛道，判断成立</b>。但正如你们自己指出的，它已经<b>不是「员工工牌」这个产品</b>，而是「B2B2C 养老 AI 终端」。</p>
+<p>决策：</p>
+<ol><li><b>1.0 不混入</b>——避免稀释工牌的产品焦点，也避免「要配虑个人情报」（老人病史 / 健康数据）的合规复杂度拖累 1.0 交付节奏。</li><li><b>记录为独立产品方向（Backlog）</b>——待 1.0 工牌稳定后，单独做：产品定位、目标用户、权限模型、隐私与数据保存、紧急呼叫、设备形态等设计。</li><li><b>1.0 仍保留介护的「员工侧」价值</b>——工牌给<b>介护员</b>用（不是给老人用）：照护知识库、定时翻身 / 服药提醒（提醒对象是介护员）、护理日志、呼叫支援（介护员 → 组长）。</li></ol>
+<h3>建议给到需求的要点</h3>
+<ul><li>介护场景 1.0 需求边界：明确「工牌的使用者是<b>介护员</b>」，老人陪伴相关能力<b>不进 1.0 需求清单</b>。</li><li>「老人陪伴设备」作为独立方向单列，待立项后再展开。</li></ul>
+<hr>
+<h2>附：本轮 9 条建议处理结论一览</h2>
+<table><thead><tr><th>#</th><th>建议</th><th>结论</th></tr></thead><tbody><tr><td>一</td><td>主动推送定时轮询 + 可配置</td><td>✅ 采纳</td></tr><tr><td>二</td><td>叫车降级 + 查空房 Agent+PMS</td><td>✅ 采纳</td></tr><tr><td>三</td><td>免税知识库化 + 删开退税单</td><td>✅ 采纳</td></tr><tr><td>四</td><td>机场重新定位翻译 + 知识库</td><td>✅ 采纳（空乘需注意机上无网）</td></tr><tr><td>五</td><td>工地补移动网络</td><td>✅ 采纳</td></tr><tr><td>六</td><td>劳务派遣考勤入口</td><td>✅ 采纳，但 1.0 只做到岗登记（本回复）</td></tr><tr><td>七</td><td>制造维修上报 + 点检闭环</td><td>✅ 采纳</td></tr><tr><td>八</td><td>介护老人陪伴设备</td><td>🟡 单独立项，1.0 不混入（本回复）</td></tr><tr><td>九</td><td>彩屏 + 方向键 + 确认键</td><td>✅ 已确认为现状</td></tr></tbody></table></body></html>

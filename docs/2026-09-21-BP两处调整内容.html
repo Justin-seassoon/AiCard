@@ -1,0 +1,57 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>BP 两处调整内容（供替换）</title><style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.6; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 18pt; font-weight: 700;
+       text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 14pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+h3 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 12pt; font-weight: 700;
+       color: #1a3c6e; margin: 12pt 0 4pt; }
+p { margin: 3pt 0; }
+blockquote { margin: 6pt 0; padding: 6pt 10pt; background: #f4f7fb; border-left: 3px solid #2b6cb0; color: #333; }
+ul, ol { margin: 4pt 0; padding-left: 0; list-style: none; }
+li { margin: 0 0 4pt; padding-left: 12pt; text-indent: -12pt; }
+li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+ol { counter-reset: item; }
+ol li { counter-increment: item; }
+ol li::before { content: counter(item) '. '; color: #2b6cb0; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 5pt 0 10pt; font-size: 9pt; }
+th, td { border: 1px solid #b9c4d4; padding: 4pt 7pt; vertical-align: top; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+code { font-family: 'Menlo', 'Monaco', monospace; background: #f0f2f5; padding: 0 3px; border-radius: 3px; font-size: 9.5pt; }
+hr { border: none; border-top: 1px solid #e0e5ec; margin: 12pt 0; }
+b { font-weight: 700; }
+</style></head><body><div class='doctitle'>BP 两处调整内容（供替换）</div>
+<div class='subtitle'>日期：2026-09-21<br>用途：把 BP 中两处会伤投资人/客户可信度的表述，替换为更稳妥的口径，供合作伙伴直接粘贴修改。<br>说明：仅改表述，不改事实——技术能力是真的，换一种说得出口、经得起尽调的说法。</div>
+<hr>
+<h2>调整 1：「准确率 100%」→「高置信才外放、低置信不误导」</h2>
+<p><b>位置</b>：06 AI 工牌硬件（硬件卖点 bullet 列表）</p>
+<p><b>原文</b>：</p>
+<blockquote>杜绝大模型幻觉，对齐知识库，确认OK，准确率100%</blockquote>
+<p><b>改为（推荐）</b>：</p>
+<blockquote>杜绝大模型幻觉：对齐企业知识库作答，仅高置信答案外放；低置信或知识库未命中时明确提示「暂无明确说明」，不强行作答。</blockquote>
+<p><b>为什么改</b>：</p>
+<ul><li>「准确率 100%」是绝对化表述，技术尽调必被挑——任何 ASR/翻译/大模型都不可能 100%，写死反而自曝短板。</li><li>这一条其实和 BP 第 05、07 项<b>已经写的内容自相矛盾</b>：那里已经写了「无明确依据时明确提示『员工知识库中暂无明确说明』」「只允许低风险、高置信答案成为 AI 播报候选，必要时员工按 OK 确认」。此处改为「高置信才外放、低置信不误导」是<b>统一口径</b>，不是弱化，反而把「门控机制」当卖点讲，更硬。</li><li>真实产品机制正是「质量门控 + LID 降级 + 白名单」，这样写<b>可现场演示</b>。</li></ul>
+<hr>
+<h2>调整 2：团队「成人硬件」背景 → 纯技术叙事</h2>
+<p><b>位置</b>：01 团队简介（姜华、金耀辉两位的核心价值 bullet）</p>
+<p><b>背景</b>：技术（情感计算、声学、嵌入式 AI、大规模用户增长）是硬本事，但「情趣 / 成人硬件」在<b>日本酒店 / 免税店 / 派遣公司</b>这种极度保守的 B2B 场景是直接劝退项。只需换措辞，不必删能力。</p>
+<h3>姜华（联合创始人）</h3>
+<p><b>原文</b>：</p>
+<blockquote>战略卡位：2023年率先洞察「AI+成人硬件」融合趋势，主导VINETALK技术-商业模式闭环设计。</blockquote>
+<p><b>改为</b>：</p>
+<blockquote>战略卡位：2023年率先洞察「AI + 智能硬件」融合趋势，主导从硬件到云端 AI 的「技术—商业模式」闭环设计与落地，验证了硬件 + 云端 AI + 订阅的产品范式。</blockquote>
+<h3>金耀辉（首席科学家）</h3>
+<p><b>原文</b>：</p>
+<blockquote>技术转化：主导自研情趣场景专用大模型，情绪识别准确率92%，技术代差壁垒确立者。</blockquote>
+<p><b>改为</b>：</p>
+<blockquote>技术转化：主导自研情感计算专用大模型，情绪识别准确率 92%，在声学与情感计算领域确立技术代差壁垒。</blockquote>
+<p><b>为什么改</b>：</p>
+<ul><li>「情感计算（Affective Computing）」是金耀辉教授本人专利所在的<b>正经学术方向</b>，把「情趣场景大模型」改为「情感计算大模型」，既去掉雷区、又更准确、更显学术权威。</li><li>「情绪识别 92%」「硬件+云端AI+订阅闭环」「AI+智能硬件」这些<b>真实能力全部保留</b>，只是把「成人硬件」语境抽掉。</li><li>蒋旭（CEO）部分无成人硬件表述，<b>无需改动</b>。</li></ul>
+<hr>
+<h2>附：改后一句话自查</h2>
+<blockquote>改完后，任何一处出现「100%」「情趣」「成人硬件」的地方，都应能替换为「高置信/明确提示」「情感计算」「智能硬件」。若还有遗漏，请一并扫一遍。</blockquote>
+<p>（本文档不改动 BP 原文件，仅为替换文案清单。）</p></body></html>
