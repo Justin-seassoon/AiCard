@@ -17,6 +17,11 @@
   .industry-tabs button { padding: 8px 18px; font-size: 14px; font-weight: 600; border: 1px solid #2a4a63; background: transparent; color: #9fb3c8; border-radius: 20px; cursor: pointer; }
   .industry-tabs button.active { background: #2e6da4; color: #fff; border-color: #2e6da4; }
 
+  .sub-tabs { display: none; background: #0f2130; padding: 8px 24px; border-bottom: 1px solid #1e3548; gap: 8px; }
+  .sub-tabs.visible { display: flex; }
+  .sub-tabs button { padding: 5px 14px; font-size: 13px; font-weight: 600; border: 1px solid #2a4a63; background: transparent; color: #9fb3c8; border-radius: 16px; cursor: pointer; }
+  .sub-tabs button.active { background: #1a7f37; color: #fff; border-color: #1a7f37; }
+
   .layout { display: flex; min-height: calc(100vh - 58px); }
   .script-panel { width: 42%; padding: 20px; border-right: 1px solid #1e3548; overflow-y: auto; }
   .dashboard-panel { flex: 1; padding: 20px; overflow-y: auto; }
@@ -77,7 +82,17 @@
     <button id="tab-dutyfree" onclick="switchIndustry('dutyfree')">🛍 免税店</button>
     <button id="tab-airport" onclick="switchIndustry('airport')">✈️ 机场</button>
     <button id="tab-site" onclick="switchIndustry('site')">🏗 工地</button>
+    <button id="tab-dispatch" onclick="switchIndustry('dispatch')">👥 劳务派遣</button>
   </div>
+</div>
+
+<div class="sub-tabs" id="sub-tabs">
+  <button id="sub-all" class="active" onclick="switchSub('all')">全部</button>
+  <button id="sub-manufacture" onclick="switchSub('manufacture')">🏭 制造</button>
+  <button id="sub-restaurant" onclick="switchSub('restaurant')">🍜 餐饮</button>
+  <button id="sub-agriculture" onclick="switchSub('agriculture')">🌾 农业</button>
+  <button id="sub-care" onclick="switchSub('care')">🧑‍⚕️ 介护</button>
+  <button id="sub-cleaning" onclick="switchSub('cleaning')">🧹 清扫</button>
 </div>
 
 <div class="layout">
@@ -100,9 +115,14 @@
       notice: '台風接近のため、明日は臨時休業いたします（台风接近，明日停业）',
       langs: [{ name: '中文', pct: 45 }, { name: '英语', pct: 30 }, { name: '韩语', pct: 15 }, { name: '其他', pct: 10 }],
       story: {
-        eval: '前台小王本月接待 400 位游客、零投诉、推荐成功率 30% —— 谁是优秀员工，数据说话',
+        eval: '前台小王本月接待 400 位游客、零投诉、推荐成功率 30% —— 优秀员工被看见，好做法被复制',
         innov: '后台发现游客高频问「婴儿座椅」→ 公司据此推出「亲子房」套餐',
         trend: '本季度越南语游客增长 40% → 公司提前招聘越南语店员',
+      },
+      vision: {
+        active: 'VIP 王先生 14:00 到店前，工牌主动提醒前台「偏好高楼层、需安静房」，并备好欢迎语',
+        exec: '帮前台连 PMS 直接办：叫车、查空房、写投诉工单',
+        memory: '记住回头客的房型偏好、过敏史、投诉历史',
       },
       script: [
         { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：游客说中文「我要办入住」→ 工牌翻成日语', talk: '语言障碍瞬间消失，店员和游客直接对话了' },
@@ -123,6 +143,11 @@
         innov: '后台发现「龙角散」被问爆 → 公司加大该品备货并推为爆款',
         trend: '中国大陆游客回暖、免税消费单价上升 → 调整 SKU 结构',
       },
+      vision: {
+        active: '「龙角散」库存不足时，工牌主动提醒柜员补货，并推送爆款话术',
+        exec: '帮柜员连系统直接办：查库存、开退税单、记录客诉',
+        memory: '记住会员的购买历史、皮肤类型、品牌偏好',
+      },
       script: [
         { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：中国游客问「这个能免税吗」→ 工牌翻成日语', talk: '免税店是多语种最集中的场景，翻译是刚需' },
         { step: '承', title: '知识远程支持', value: '总部知识下发一线', demo: '模拟器：店员问「消耗品退税规则」→ 工牌从知识库答', talk: '退税规则复杂，店员不用记，工牌答' },
@@ -141,6 +166,11 @@
         eval: '地勤小李本月响应 500 次、投诉 0 —— 服务质量量化',
         innov: '后台发现「转机咨询」高频 → 优化转机引导牌',
         trend: '东南亚航线旅客增长 → 增加泰语/越南语地勤',
+      },
+      vision: {
+        active: '登机口变更时，工牌主动提醒地勤，并对即将误机的旅客提前预警',
+        exec: '帮地勤连系统直接办：改签、查航班、引导叫车',
+        memory: '记住常旅客偏好、轮椅/特殊服务需求',
       },
       script: [
         { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：旅客问「登机口在哪」→ 工牌翻成日语', talk: '机场多语种旅客，翻译是刚需' },
@@ -161,6 +191,11 @@
         innov: '后台发现「安全带系法」高频问 → 录制教学视频下发',
         trend: '越南劳工占比上升 → 增加越南语安全培训',
       },
+      vision: {
+        active: '台风临近时，工牌主动提醒班组长停工，并逐人推送母语通知',
+        exec: '帮班组长直接办：报工伤、派工、统计到岗',
+        memory: '记住劳工的技能、资质、在留期限',
+      },
       script: [
         { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：劳工说越南语「收到」→ 工牌翻成日语', talk: '多国劳工，翻译是安全前提' },
         { step: '承', title: '知识远程支持', value: '总部知识下发一线', demo: '模拟器：劳工问「安全带怎么系」→ 工牌答', talk: '安全规范下沉到一线，降低事故' },
@@ -169,27 +204,196 @@
         { step: '生', title: '数据闭环', value: '越用越聪明', demo: '看板：高频「安全带系法」→ 提示补录 → 沉淀安全培训', talk: '一线安全数据回流，优化安全管理' },
       ],
     },
+    dispatch: {
+      name: '劳务派遣',
+      faqQuestions: ['給料はいつ支払われますか？', '残業代はどう計算されますか？', '在留カードは常に持ち歩かないといけませんか？', '技能実習の期間は？', '困ったとき、どこに相談できますか？'],
+      brands: ['技能実習', '特定技能', '在留カード', 'ヘルメット', '安全帯', '残業代'],
+      notice: '明日はA工場へ出勤してください（明天请到A工厂上班）',
+      langs: [{ name: '越南语', pct: 35 }, { name: '印尼语', pct: 25 }, { name: '中文', pct: 20 }, { name: '菲律宾语', pct: 12 }, { name: '其他', pct: 8 }],
+      story: {
+        eval: '派遣管理员小陈本月管理 120 名技能実習生、到岗率 98%、投诉 0 —— 到岗与服务全量化',
+        innov: '后台发现「残業代計算」高频问 → 制作多语种薪资说明手册下发',
+        trend: '印尼/菲律宾劳工占比上升 → 提前增加印尼语/他加禄语岗前培训',
+      },
+      vision: {
+        active: '劳工在留期限临近时，工牌主动提醒管理员续签，并预警到岗率异常',
+        exec: '帮管理员直接办：排班派工、发通知、统计考勤',
+        memory: '记住劳工的技能、考勤、考评记录',
+      },
+      script: [
+        { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：劳工说越南语「机器坏了」→ 工牌翻成日语给日本管理者', talk: '劳工↔管理者语言不通，翻译是安全与管理的前提' },
+        { step: '承', title: '培训知识下沉', value: '岗前/安全/技能培训', demo: '模拟器：劳工问「安全带怎么系」→ 工牌从培训知识库答', talk: '岗前培训、安全规范、技能 SOP 下沉到一线，降低事故' },
+        { step: '转', title: '调度通知', value: '多语种一键派工', demo: '模拟器：派遣公司发「明天去B餐饮店报到」→ 劳工各自母语收到', talk: '排班、派工、台风停工，多语种一键触达' },
+        { step: '合', title: '团队管理', value: '考勤·考评·技能追踪', demo: '模拟器：后台看板实时看各劳工到岗/技能证书/在留期限', talk: '上百名劳工的考勤、考评、证书、签证到期一目了然' },
+        { step: '生', title: '数据闭环', value: '越用越聪明', demo: '看板：高频问「残業代」→ 提示补录 → 沉淀培训手册', talk: '一线问题回流，派遣公司据此优化培训、管理、续约' },
+      ],
+      subs: {
+        manufacture: {
+          name: '制造',
+          faqQuestions: ['工場に入るときに必ず着けるものは？', '機械の近くで注意することは？', '緊急停止ボタンはいつ押しますか？', '火事になったら？', '作業の手順が分からないときは？'],
+          brands: ['ヘルメット', '静電気対策', '緊急停止ボタン', '5S', '保護メガネ'],
+          notice: '本日、3号ラインの機械点検があります（今天3号线机器检修）',
+          langs: [{ name: '越南语', pct: 40 }, { name: '中文', pct: 25 }, { name: '印尼语', pct: 20 }, { name: '其他', pct: 15 }],
+          story: {
+            eval: '班长老王本月带 3 条产线 80 名劳工、不良品率下降 15% —— 品质量化',
+            innov: '后台发现「緊急停止ボタン」高频问 → 加强岗前安全培训',
+            trend: '越南劳工占比上升 → 增加越南语操作规范培训',
+          },
+          vision: {
+            active: '设备到点检时间时，工牌主动提醒班组长，并对不良品率异常预警',
+            exec: '帮班组长直接办：报不良、发起维修工单、排班',
+            memory: '记住劳工的技能等级、产线熟练度',
+          },
+          script: [
+            { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：劳工说越南语「机器有异响」→ 工牌翻成日语给日本班组长', talk: '劳工↔班组长语言不通，翻译是安全与品质的前提' },
+            { step: '承', title: '培训知识下沉', value: '操作规范/安全', demo: '模拟器：劳工问「进车间要穿戴什么」→ 工牌答（安全帽/防静电鞋/工作服）', talk: '操作规范、安全须知、5S 下沉到一线，降低事故与不良品' },
+            { step: '转', title: '安全提醒', value: '危险预警', demo: '模拟器：系统推送「机械检修，请勿靠近」→ 劳工母语提醒', talk: '机械/化学品风险，多语种触达' },
+            { step: '合', title: '团队管理', value: '技能·出勤·不良品', demo: '模拟器：班组长看板实时看各劳工技能等级/出勤/不良品数', talk: '产线人员多，技能、出勤、品质一目了然' },
+            { step: '生', title: '数据闭环', value: '越用越聪明', demo: '看板：高频「緊急停止」→ 提示补录 → 沉淀安全培训', talk: '一线安全数据回流，优化产线管理' },
+          ],
+        },
+        restaurant: {
+          name: '餐饮',
+          faqQuestions: ['手洗いはいつしますか？', '生ものと加熱した食品はどう分けますか？', '体調が悪いときは？', 'お客様が来たら、まず何と言いますか？', '髪や爪、身だしなみのルールは？'],
+          brands: ['食中毒', 'ノロウイルス', 'アレルギー8品目', '生もの', '手洗い'],
+          notice: '本日、ノロウイルス対策のため手洗いを徹底してください（今天请彻底洗手防诺如）',
+          langs: [{ name: '越南语', pct: 35 }, { name: '中文', pct: 25 }, { name: '印尼语', pct: 20 }, { name: '缅甸语', pct: 10 }, { name: '其他', pct: 10 }],
+          story: {
+            eval: '后厨小张本月卫生检查零扣分、投诉 0 —— 卫生合规量化',
+            innov: '后台发现「アレルギー8品目」高频问 → 制作多语种过敏原对照卡',
+            trend: '缅甸劳工占比上升 → 增加缅甸语卫生培训',
+          },
+          vision: {
+            active: '卫生检查临近时，工牌主动提醒店长，并对诺如/食中毒高发预警',
+            exec: '帮店长直接办：报食品安全、补货下单、排班',
+            memory: '记住员工的卫生检查记录、培训进度',
+          },
+          script: [
+            { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：劳工问「客人说对虾过敏」→ 工牌翻成日语给店长', talk: '劳工↔店长/客人语言不通，翻译是接客与卫生的前提' },
+            { step: '承', title: '培训知识下沉', value: '接客/食品卫生', demo: '模拟器：劳工问「生熟怎么分开」→ 工牌答（砧板/刀具分色）', talk: '接客用语、卫生规范、过敏原 8 品目下沉到一线' },
+            { step: '转', title: '卫生提醒', value: '食品安全预警', demo: '模拟器：系统推送「诺如高发期，加强洗手」→ 劳工母语提醒', talk: '食中毒/诺如高发期，多语种提醒' },
+            { step: '合', title: '团队管理', value: '卫生·出勤·培训', demo: '模拟器：店长看板看各劳工卫生检查/出勤/培训进度', talk: '后厨人员多，卫生合规与出勤一目了然' },
+            { step: '生', title: '数据闭环', value: '越用越聪明', demo: '看板：高频「过敏原」→ 提示补录 → 沉淀对照卡', talk: '一线卫生数据回流，优化后厨管理' },
+          ],
+        },
+        agriculture: {
+          name: '农业',
+          faqQuestions: ['農薬を扱うときの注意は？', '農薬散布の後、畑に入っていいですか？', '熱中症を防ぐには？', '機械を使うときの注意は？', '収穫の基準はどこにありますか？'],
+          brands: ['農薬', '熱中症', '刈払機', '防除衣', '収穫基準'],
+          notice: '本日は猛暑のため、正午は作業を中断してください（今天酷暑，正午停工）',
+          langs: [{ name: '越南语', pct: 35 }, { name: '印尼语', pct: 25 }, { name: '中文', pct: 20 }, { name: '菲律宾语', pct: 10 }, { name: '其他', pct: 10 }],
+          story: {
+            eval: '农场班组长本月带 60 名劳工、收获达标率 95%、事故 0 —— 农事量化',
+            innov: '后台发现「農薬散布後の畑」高频问 → 制作农药安全口诀',
+            trend: '印尼劳工占比上升 → 增加印尼语农药安全培训',
+          },
+          vision: {
+            active: '农药安全间隔期未到，工牌主动提醒劳工勿进田，并预警高温',
+            exec: '帮农主直接办：记农药台账、报天气、派工',
+            memory: '记住农田/作物、农药使用记录',
+          },
+          script: [
+            { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：劳工说印尼语「农药配好了」→ 工牌翻成日语给农主', talk: '劳工↔农主语言不通，翻译是安全与作业的前提' },
+            { step: '承', title: '培训知识下沉', value: '种植/农药/机械', demo: '模拟器：劳工问「农药怎么安全使用」→ 工牌答（防护具/风向）', talk: '种植技术、农药安全、机械操作、收获标准下沉到一线' },
+            { step: '转', title: '安全提醒', value: '农药/热中症预警', demo: '模拟器：系统推送「高温预警，防中暑」→ 劳工母语提醒', talk: '农药、热中症风险，多语种触达' },
+            { step: '合', title: '团队管理', value: '出勤·收获量·培训', demo: '模拟器：农主看板看各劳工出勤/收获量/培训进度', talk: '农忙人多，出勤与产出量化一目了然' },
+            { step: '生', title: '数据闭环', value: '越用越聪明', demo: '看板：高频「農薬」→ 提示补录 → 沉淀安全培训', talk: '一线农事数据回流，优化种植管理' },
+          ],
+        },
+        care: {
+          name: '介护',
+          faqQuestions: ['介護で一番大切なことは？', '移動の介助をするときは？', '腰を痛めないコツは？', '利用者の話が聞き取れないときは？', '介護の技能実習に必要な日本語能力は？'],
+          brands: ['認知症', '移乗', '褥瘡', '尊厳', 'バイタル'],
+          notice: '本日は夜勤の人員が変更になりました（今天夜班人员变更）',
+          langs: [{ name: '菲律宾语', pct: 30 }, { name: '印尼语', pct: 25 }, { name: '越南语', pct: 20 }, { name: '中文', pct: 15 }, { name: '其他', pct: 10 }],
+          story: {
+            eval: '介护组长本月带 40 名介护员、事故 0、家属好评率 95% —— 服务质量量化',
+            innov: '后台发现「移動の介助」高频问 → 制作腰部保护教学',
+            trend: '菲律宾介护员占比上升 → 增加他加禄语介护规范培训',
+          },
+          vision: {
+            active: '老人到点需翻身/服药，工牌主动提醒介护员，并预警褥疮风险',
+            exec: '帮介护员直接办：呼叫支援、记护理日志、通知家属',
+            memory: '记住老人的病史、偏好、护理计划',
+          },
+          script: [
+            { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：介护员说菲律宾语「老人需要上厕所」→ 工牌翻成日语给护士', talk: '介护员↔护士/家属语言不通，翻译是照护与安全的前提' },
+            { step: '承', title: '培训知识下沉', value: '照护规范/伦理', demo: '模拟器：介护员问「怎么移动照护」→ 工牌答（护腰/正确姿势）', talk: '介护规范、伦理、紧急应对下沉到一线' },
+            { step: '转', title: '紧急应对', value: '呼叫支援', demo: '模拟器：系统推送「302 房间呼叫支援」→ 介护员母语收到', talk: '紧急呼叫，多语种快速触达' },
+            { step: '合', title: '团队管理', value: '排班·资质·培训', demo: '模拟器：组长看板看各介护员排班/资质/培训', talk: '介护员资质与排班一目了然' },
+            { step: '生', title: '数据闭环', value: '越用越聪明', demo: '看板：高频「移動介助」→ 提示补录 → 沉淀教学', talk: '一线照护数据回流，优化介护培训' },
+          ],
+        },
+        cleaning: {
+          name: '清扫',
+          faqQuestions: ['清掃の基本の順番は？', '雑巾の色分けは？', '洗剤や薬品を使うときの注意は？', '薬品を混ぜてもいいですか？', '客室の私物に触れていいですか？'],
+          brands: ['洗剤', '薬品', '雑巾', '脚立', '忘れ物'],
+          notice: '本日はAビルの清掃に入ってください（今天请去A大厦清扫）',
+          langs: [{ name: '越南语', pct: 35 }, { name: '中文', pct: 25 }, { name: '印尼语', pct: 20 }, { name: '菲律宾语', pct: 10 }, { name: '其他', pct: 10 }],
+          story: {
+            eval: '清扫班长老李本月带 70 名清扫员、客户投诉 0、检查合格率 98% —— 质量量化',
+            innov: '后台发现「薬品混合」高频问 → 制作化学品安全卡',
+            trend: '越南清扫员占比上升 → 增加越南语清洁标准培训',
+          },
+          vision: {
+            active: '检查临近时，工牌主动提醒主管，并对化学品安全间隔预警',
+            exec: '帮主管直接办：报失物、派区域、记检查结果',
+            memory: '记住负责区域、检查结果、客户隐私规则',
+          },
+          script: [
+            { step: '起', title: '跨语言沟通', value: '翻译（入口）', demo: '模拟器：清扫员说越南语「客人落东西了」→ 工牌翻成日语给主管', talk: '清扫员↔主管语言不通，翻译是作业与隐私的前提' },
+            { step: '承', title: '培训知识下沉', value: '清洁标准/化学品', demo: '模拟器：清扫员问「抹布怎么分色」→ 工牌答（马桶/地板/桌分色）', talk: '清洁标准、化学品安全、客户隐私下沉到一线' },
+            { step: '转', title: '任务派工', value: '多语种一键派工', demo: '模拟器：主管发「今天扫A大厦」→ 清扫员母语收到', talk: '清洁任务多，多语种一键派工' },
+            { step: '合', title: '团队管理', value: '出勤·区域·检查', demo: '模拟器：主管看板看各清扫员出勤/负责区域/检查结果', talk: '清扫员多，出勤与质量一目了然' },
+            { step: '生', title: '数据闭环', value: '越用越聪明', demo: '看板：高频「薬品」→ 提示补录 → 沉淀安全卡', talk: '一线作业数据回流，优化清洁管理' },
+          ],
+        },
+      },
+    },
   };
 
   var current = 'hotel';
+  var currentSub = 'all';
   var activeStep = 0;
   var customerId = 1, storeId = 1;
 
   function switchIndustry(key) {
     current = key;
+    currentSub = 'all';
     document.querySelectorAll('.industry-tabs button').forEach(function (b) { b.classList.remove('active'); });
     document.getElementById('tab-' + key).classList.add('active');
+    document.getElementById('sub-tabs').classList.toggle('visible', key === 'dispatch');
+    if (key === 'dispatch') {
+      document.querySelectorAll('.sub-tabs button').forEach(function (b) { b.classList.remove('active'); });
+      document.getElementById('sub-all').classList.add('active');
+    }
     activeStep = 0;
     renderScript();
     renderDashboard();
   }
 
+  function switchSub(key) {
+    currentSub = key;
+    document.querySelectorAll('.sub-tabs button').forEach(function (b) { b.classList.remove('active'); });
+    document.getElementById('sub-' + key).classList.add('active');
+    activeStep = 0;
+    renderScript();
+    renderDashboard();
+  }
+
+  function currentData() {
+    if (current === 'dispatch' && currentSub !== 'all' && INDUSTRIES.dispatch.subs[currentSub]) {
+      return INDUSTRIES.dispatch.subs[currentSub];
+    }
+    return INDUSTRIES[current];
+  }
+
   function renderScript() {
-    var d = INDUSTRIES[current];
+    var d = currentData();
     var steps = d.script.concat([{
       step: '远', title: '主动与执行（愿景）', value: '从工具到 agent',
-      demo: '愿景：主动提醒「VIP 到店」「补货建议」，帮一线「叫车」「记录投诉」',
-      talk: '翻译机是被动响应，agent 会主动提醒、帮你执行、记住客人——这是公司经营的基础设施'
+      demo: d.vision.active,
+      talk: d.vision.exec + ' —— 从被动翻译，到主动提醒、替你执行'
     }]);
     var html = '';
     steps.forEach(function (s, i) {
@@ -205,7 +409,7 @@
   function setStep(i) { activeStep = i; renderScript(); }
 
   function renderDashboard() {
-    var d = INDUSTRIES[current];
+    var d = currentData();
     var langHtml = '';
     d.langs.forEach(function (l) {
       langHtml += '<div class="bar-row"><span class="lbl">' + l.name + '</span>'
@@ -223,15 +427,15 @@
       + '<div class="card"><h3>🏷 品牌词识别</h3><div class="chips">' + chipsHtml + '</div>'
       + '<div class="hint">游客说这些品牌词时，工牌识别并保留原词，不误翻</div></div>'
       + '<div class="card"><h3>📊 数据驱动的经营（三件事）</h3><div class="story-grid">'
-      + '<div class="story"><div class="k">📋 员工考评</div><div class="v">' + d.story.eval + '</div></div>'
+      + '<div class="story"><div class="k">🌟 一线成长</div><div class="v">' + d.story.eval + '</div></div>'
       + '<div class="story"><div class="k">💡 产品创新</div><div class="v">' + d.story.innov + '</div></div>'
       + '<div class="story"><div class="k">📈 市场趋势</div><div class="v">' + d.story.trend + '</div></div>'
       + '</div></div>'
       + '<div class="card"><h3>🤖 这是 agent，不只是翻译机（愿景）</h3><div class="story-grid">'
-      + '<div class="story"><div class="k">🎯 主动</div><div class="v">合适时机主动提醒：VIP 到店、补货建议、台风预警</div></div>'
-      + '<div class="story"><div class="k">⚡ 执行</div><div class="v">连公司系统，真的帮一线做事：叫车、写工单、发留言</div></div>'
+      + '<div class="story"><div class="k">🎯 主动</div><div class="v">' + d.vision.active + '</div></div>'
+      + '<div class="story"><div class="k">⚡ 执行</div><div class="v">' + d.vision.exec + '</div></div>'
       + '<div class="story"><div class="k">💬 对话</div><div class="v">多轮追问澄清，不是一问一答</div></div>'
-      + '<div class="story"><div class="k">🧠 记忆</div><div class="v">记住客人偏好、员工情况</div></div>'
+      + '<div class="story"><div class="k">🧠 记忆</div><div class="v">' + d.vision.memory + '</div></div>'
       + '</div></div>';
     loadFaqAnswers(d);
   }
