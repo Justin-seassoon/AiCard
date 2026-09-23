@@ -20,3 +20,8 @@ target/
 .idea/
 *.iml
 .vscode/
+
+# 外部输入文档（他人提供的 docx/md，不入库；BP 为机密）
+7+24AI智能工牌商业计划书.docx
+远景功能落地方案补充整理.docx
+AI 工牌 P4 : C5 固定配套版本 OTA 升级方案（端云评审稿）.md

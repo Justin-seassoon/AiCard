@@ -42,6 +42,11 @@ aibridgex:
   base-url: ${AIBRIDGEX_BASE_URL:https://api.aibridgex.net/v1}
   key: ${AIBRIDGEX_KEY:}
   model: ${AIBRIDGEX_MODEL:deepseek-v4-flash}
+ota:
+  storage-dir: ${OTA_STORAGE_DIR:/data/ota}
+  sign-secret: ${OTA_SIGN_SECRET:ota-demo-sign-secret}
+  url-expires-sec: 3600
+  public-base-url: ${OTA_PUBLIC_BASE_URL:}
 management:
   endpoints:
     web:
