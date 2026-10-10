@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 工牌运营后台</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", sans-serif;
+    background: #f5f7fa; color: #1a1a1a; padding: 24px; line-height: 1.6;
+  }
+  .container { max-width: 1120px; margin: 0 auto; }
+
+  header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap; gap: 12px; }
+  h1 { font-size: 22px; color: #0f2a4a; }
+  .subtitle { color: #666; font-size: 13px; margin-top: 2px; }
+  .tenant-config { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #555; }
+  .tenant-config input { width: 56px; padding: 6px 8px; border: 1px solid #c9d4de; border-radius: 6px; font-size: 13px; text-align: center; }
+
+  .tabs { display: flex; gap: 6px; border-bottom: 2px solid #0f2a4a; margin-bottom: 20px; flex-wrap: wrap; }
+  .tab {
+    padding: 10px 20px; font-size: 15px; font-weight: 600; background: none; border: none;
+    color: #666; cursor: pointer; border-radius: 8px 8px 0 0; position: relative; top: 2px;
+  }
+  .tab:hover { color: #0f2a4a; background: #e9edf2; }
+  .tab.active { color: #fff; background: #0f2a4a; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 16px; color: #0f2a4a; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #eef2f6; }
+
+  .form-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px 16px; }
+  .form-grid .full { grid-column: 1 / -1; }
+  .field label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
+  .field label .req { color: #c62828; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 9px 11px; font-size: 14px; border: 1px solid #c9d4de; border-radius: 6px; outline: none;
+    font-family: inherit; background: #fff;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color: #2e6da4; }
+  .field textarea { resize: vertical; min-height: 64px; }
+  .field .hint { font-size: 12px; color: #999; margin-top: 3px; }
+
+  .actions { margin-top: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  button {
+    padding: 9px 18px; font-size: 14px; border-radius: 6px; cursor: pointer; border: 1px solid transparent;
+  }
+  button.primary { background: #2e6da4; color: #fff; }
+  button.primary:hover { background: #255a87; }
+  button.secondary { background: #fff; color: #2e6da4; border-color: #2e6da4; }
+  button.secondary:hover { background: #eef4fa; }
+  button.danger { background: #fff; color: #c62828; border-color: #c62828; }
+  button.danger:hover { background: #fdecea; }
+  button.small { padding: 4px 10px; font-size: 12px; border-radius: 5px; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eef2f6; vertical-align: top; }
+  th { color: #666; font-weight: 600; white-space: nowrap; background: #fafbfc; }
+  td.mono { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+  .table-wrap { overflow-x: auto; }
+
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .badge.blue   { background: #e8f0fb; color: #1a56a0; }
+  .badge.orange { background: #fdeede; color: #b25d00; }
+  .badge.green  { background: #e6f4ea; color: #1a7f37; }
+  .badge.gray   { background: #eef1f4; color: #5f6b76; }
+  .badge.red    { background: #fdecea; color: #c62828; }
+
+  .empty { color: #999; text-align: center; padding: 24px 0; font-size: 13px; }
+  .error-box { background: #fdecea; color: #c62828; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-top: 10px; display: none; }
+  .toast {
+    position: fixed; top: 20px; right: 20px; padding: 12px 18px; border-radius: 8px; color: #fff; font-size: 14px;
+    z-index: 100; box-shadow: 0 4px 16px rgba(0,0,0,.15); max-width: 360px;
+  }
+  .toast.ok { background: #1a7f37; }
+  .toast.err { background: #c62828; }
+
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  /* modal */
+  .modal-mask { position: fixed; inset: 0; background: rgba(15,42,74,.4); display: none; align-items: flex-start; justify-content: center; z-index: 90; padding: 48px 16px; }
+  .modal-mask.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 10px; padding: 20px; width: 100%; max-width: 640px; max-height: 80vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 16px; color: #0f2a4a; margin-bottom: 14px; }
+
+  @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>AI 工牌运营后台</h1>
+      <div class="subtitle">周报月报 · 运营通知 · 维修点检（演示工具）</div>
+    </div>
+    <div class="tenant-config">
+      <span>租户</span>
+      <span>客户ID</span><input id="customerId" type="number" value="1">
+      <span>门店ID</span><input id="storeId" type="number" value="1">
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="report">周报 / 月报</button>
+    <button class="tab" data-tab="notification">运营通知</button>
+    <button class="tab" data-tab="order">维修单</button>
+    <button class="tab" data-tab="inspection">点检任务</button>
+  </nav>
+
+  <!-- ==================== 周报 / 月报 ==================== -->
+  <section id="panel-report" class="panel active">
+    <div class="card">
+      <h2>手动生成报表</h2>
+      <div class="form-grid">
+        <div class="field"><label>设备ID <span class="req">*</span></label><input id="rep-device" placeholder="device-001"></div>
+        <div class="field">
+          <label>周期类型</label>
+          <select id="rep-type"><option value="weekly">周报</option><option value="monthly">月报</option></select>
+        </div>
+        <div class="field"><label>周期起始 <span class="req">*</span></label><input id="rep-start" type="date"></div>
+        <div class="field"><label>周期结束</label><input id="rep-end" type="date"></div>
+        <div class="field" style="display:flex;align-items:flex-end;">
+          <button class="primary" onclick="generateReport()">生成报表</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>报表查询</h2>
+      <div class="form-grid">
+        <div class="field">
+          <label>周期类型</label>
+          <select id="rep-q-type"><option value="weekly">周报</option><option value="monthly">月报</option></select>
+        </div>
+        <div class="field"><label>起始日期</label><input id="rep-q-start" type="date"></div>
+        <div class="field"><label>结束日期</label><input id="rep-q-end" type="date"></div>
+        <div class="field" style="display:flex;align-items:flex-end;">
+          <button class="secondary" onclick="loadReports()">查询</button>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px;">
+        <table>
+          <thead><tr>
+            <th>设备ID</th><th>类型</th><th>周期起</th><th>周期止</th><th>轮次</th><th>会话</th><th>问答命中</th><th>活跃天数</th><th>指标(metrics)</th><th>生成时间</th>
+          </tr></thead>
+          <tbody id="report-tbody"></tbody>
+        </table>
+        <div class="empty" id="report-empty" style="display:none;">暂无报表数据</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 运营通知 ==================== -->
+  <section id="panel-notification" class="panel">
+    <div class="card">
+      <h2>新建运营通知</h2>
+      <div class="form-grid">
+        <div class="field full"><label>标题</label><input id="ntf-title" placeholder="例如：台风天临时停业通知"></div>
+        <div class="field full"><label>文案内容 <span class="req">*</span></label><textarea id="ntf-content" placeholder="本店因台风临时停业，敬请谅解。"></textarea></div>
+        <div class="field"><label>源语言 <span class="req">*</span></label><input id="ntf-src-lang" value="ja-JP" placeholder="ja-JP / zh-CN / en-US"></div>
+        <div class="field">
+          <label>目标类型 <span class="req">*</span></label>
+          <select id="ntf-target-type">
+            <option value="device">设备</option>
+            <option value="group">群组</option>
+          </select>
+        </div>
+        <div class="field"><label>目标ID <span class="req">*</span></label><input id="ntf-target-id" placeholder="设备ID / 群组ID"></div>
+        <div class="field">
+          <label>触发类型 <span class="req">*</span></label>
+          <select id="ntf-trigger-type" onchange="syncNtfTrigger()">
+            <option value="once">单次</option>
+            <option value="cron">周期</option>
+          </select>
+        </div>
+        <div class="field" id="ntf-once-wrap"><label>排期时间</label><input id="ntf-schedule-at" type="datetime-local"></div>
+        <div class="field" id="ntf-cron-wrap" style="display:none;"><label>Cron 表达式</label><input id="ntf-cron" placeholder="0 0 9 * * *"></div>
+        <div class="field" style="display:flex;align-items:flex-end;">
+          <button class="primary" onclick="createNotification()">创建通知</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>通知列表</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>标题</th><th>内容</th><th>源语言</th><th>目标</th><th>触发</th><th>排期</th><th>状态</th><th>创建时间</th><th>操作</th>
+          </tr></thead>
+          <tbody id="ntf-tbody"></tbody>
+        </table>
+        <div class="empty" id="ntf-empty" style="display:none;">暂无通知</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 维修单 ==================== -->
+  <section id="panel-order" class="panel">
+    <div class="card">
+      <h2>新建维修单</h2>
+      <div class="form-grid">
+        <div class="field"><label>维修单号 <span class="req">*</span></label><input id="ord-no" placeholder="RO-20261010-001"></div>
+        <div class="field"><label>设备ID</label><input id="ord-device" placeholder="device-001"></div>
+        <div class="field"><label>上报人</label><input id="ord-reporter" placeholder="张三"></div>
+        <div class="field full"><label>标题 <span class="req">*</span></label><input id="ord-title" placeholder="扬声器无声音"></div>
+        <div class="field full"><label>描述</label><textarea id="ord-desc" placeholder="故障现象、复现步骤等"></textarea></div>
+        <div class="field full" style="display:flex;align-items:flex-end;">
+          <button class="primary" onclick="createOrder()">创建维修单</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>维修单列表</h2>
+      <div class="form-grid" style="grid-template-columns: 200px auto;">
+        <div class="field">
+          <label>状态筛选</label>
+          <select id="ord-filter" onchange="loadOrders()">
+            <option value="">全部</option>
+            <option value="open">待处理</option>
+            <option value="processing">处理中</option>
+            <option value="done">已完成</option>
+            <option value="cancelled">已取消</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:12px;">
+        <table>
+          <thead><tr>
+            <th>单号</th><th>设备ID</th><th>标题</th><th>描述</th><th>状态</th><th>上报人</th><th>创建时间</th><th>操作</th>
+          </tr></thead>
+          <tbody id="ord-tbody"></tbody>
+        </table>
+        <div class="empty" id="ord-empty" style="display:none;">暂无维修单</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== 点检任务 ==================== -->
+  <section id="panel-inspection" class="panel">
+    <div class="card">
+      <h2>新建点检任务</h2>
+      <div class="form-grid">
+        <div class="field"><label>任务号 <span class="req">*</span></label><input id="ins-no" placeholder="IT-20261010-001"></div>
+        <div class="field"><label>设备ID</label><input id="ins-device" placeholder="device-001"></div>
+        <div class="field"><label>负责人</label><input id="ins-assignee" placeholder="李四"></div>
+        <div class="field full"><label>标题 <span class="req">*</span></label><input id="ins-title" placeholder="每日设备例行点检"></div>
+        <div class="field full">
+          <label>点检清单 (JSON) <span class="req">*</span></label>
+          <textarea id="ins-checklist">["外观检查", "扬声器功能", "麦克风收音", "电量检查"]</textarea>
+          <div class="hint">JSON 数组或对象，示例：["外观检查","功能测试"]</div>
+        </div>
+        <div class="field"><label>计划日期</label><input id="ins-date" type="date"></div>
+        <div class="field full" style="display:flex;align-items:flex-end;">
+          <button class="primary" onclick="createTask()">创建点检任务</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>点检任务列表</h2>
+      <div class="form-grid" style="grid-template-columns: 200px auto;">
+        <div class="field">
+          <label>状态筛选</label>
+          <select id="ins-filter" onchange="loadTasks()">
+            <option value="">全部</option>
+            <option value="pending">待点检</option>
+            <option value="done">已点检</option>
+            <option value="closed">已关闭</option>
+          </select>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:12px;">
+        <table>
+          <thead><tr>
+            <th>任务号</th><th>设备ID</th><th>标题</th><th>清单</th><th>状态</th><th>计划日期</th><th>负责人</th><th>操作</th>
+          </tr></thead>
+          <tbody id="ins-tbody"></tbody>
+        </table>
+        <div class="empty" id="ins-empty" style="display:none;">暂无点检任务</div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- modal -->
+<div class="modal-mask" id="modal-mask">
+  <div class="modal" id="modal-body"></div>
+</div>
+
+<script>
+  // ---------- 租户 & 基础 ----------
+  var customerId = 1, storeId = 1;
+  document.getElementById('customerId').addEventListener('change', function(){ customerId = this.value; });
+  document.getElementById('storeId').addEventListener('change', function(){ storeId = this.value; });
+
+  function api(path, method, body) {
+    var opts = { method: method || 'GET', headers: { 'X-Customer-Id': customerId, 'X-Store-Id': storeId } };
+    if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return fetch(path, opts).then(function (r) {
+      return r.json().catch(function () { return null; }).then(function (d) {
+        if (!r.ok) {
+          var msg = (d && (d.message || d.error)) || ('HTTP ' + r.status);
+          throw new Error(msg);
+        }
+        return d;
+      });
+    });
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  function fmtTime(s) {
+    if (!s) return '—';
+    var d = new Date(s);
+    if (isNaN(d)) return String(s);
+    return d.toLocaleString('zh-CN', { hour12: false });
+  }
+  function shortJson(s) {
+    if (!s) return '—';
+    var t = String(s);
+    return t.length > 40 ? t.slice(0, 40) + '…' : t;
+  }
+
+  function toast(msg, ok) {
+    var el = document.createElement('div');
+    el.className = 'toast ' + (ok ? 'ok' : 'err');
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(function () { el.remove(); }, 3000);
+  }
+
+  // ---------- Tab 切换 ----------
+  document.querySelectorAll('.tab').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.tab').forEach(function (b) { b.classList.remove('active'); });
+      document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks };
+      loader[btn.dataset.tab]();
+    });
+  });
+
+  function setTbody(id, rowsHtml, emptyId, count) {
+    document.getElementById(id).innerHTML = rowsHtml;
+    document.getElementById(emptyId).style.display = count ? 'none' : 'block';
+  }
+
+  // ---------- 状态映射 ----------
+  var ORDER_STATUS = { open: ['待处理', 'blue'], processing: ['处理中', 'orange'], done: ['已完成', 'green'], cancelled: ['已取消', 'gray'] };
+  var TASK_STATUS = { pending: ['待点检', 'blue'], done: ['已点检', 'green'], closed: ['已关闭', 'gray'] };
+  var NTF_STATUS = { scheduled: ['已排期', 'blue'], sent: ['已发送', 'green'], cancelled: ['已取消', 'gray'] };
+  function badge(map, key) {
+    var e = map[key] || [key, 'gray'];
+    return '<span class="badge ' + e[1] + '">' + escapeHtml(e[0]) + '</span>';
+  }
+
+  // ==================== 周报 / 月报 ====================
+  function generateReport() {
+    var deviceId = document.getElementById('rep-device').value.trim();
+    var start = document.getElementById('rep-start').value;
+    var end = document.getElementById('rep-end').value;
+    if (!deviceId || !start) { toast('请填写设备ID与周期起始日期', false); return; }
+    var body = { deviceId: deviceId, periodType: document.getElementById('rep-type').value, start: start, end: end || null };
+    api('/api/reports/generate', 'POST', body)
+      .then(function () { toast('报表已生成', true); loadReports(); })
+      .catch(function (e) { toast('生成失败：' + e.message, false); });
+  }
+
+  function loadReports() {
+    var type = document.getElementById('rep-q-type').value;
+    var start = document.getElementById('rep-q-start').value;
+    var end = document.getElementById('rep-q-end').value;
+    var q = 'periodType=' + type;
+    if (start) q += '&start=' + start;
+    if (end) q += '&end=' + end;
+    api('/api/reports?' + q)
+      .then(function (list) {
+        var rows = (list || []).map(function (r) {
+          return '<tr>'
+            + '<td class="mono">' + escapeHtml(r.deviceId) + '</td>'
+            + '<td>' + (r.periodType === 'monthly' ? '月报' : '周报') + '</td>'
+            + '<td>' + escapeHtml(r.periodStart) + '</td>'
+            + '<td>' + escapeHtml(r.periodEnd) + '</td>'
+            + '<td>' + r.turnCount + '</td>'
+            + '<td>' + r.sessionCount + '</td>'
+            + '<td>' + r.qaHitCount + '</td>'
+            + '<td>' + r.activeDays + '</td>'
+            + '<td class="mono" title="' + escapeHtml(r.metrics) + '">' + escapeHtml(shortJson(r.metrics)) + '</td>'
+            + '<td>' + fmtTime(r.generatedAt) + '</td>'
+            + '</tr>';
+        }).join('');
+        setTbody('report-tbody', rows, 'report-empty', (list || []).length);
+      })
+      .catch(function (e) { toast('查询失败：' + e.message, false); });
+  }
+
+  // ==================== 运营通知 ====================
+  function syncNtfTrigger() {
+    var once = document.getElementById('ntf-trigger-type').value === 'once';
+    document.getElementById('ntf-once-wrap').style.display = once ? '' : 'none';
+    document.getElementById('ntf-cron-wrap').style.display = once ? 'none' : '';
+  }
+
+  function createNotification() {
+    var content = document.getElementById('ntf-content').value.trim();
+    var srcLang = document.getElementById('ntf-src-lang').value.trim();
+    var targetId = document.getElementById('ntf-target-id').value.trim();
+    var triggerType = document.getElementById('ntf-trigger-type').value;
+    if (!content || !srcLang || !targetId) { toast('请填写文案内容、源语言、目标ID', false); return; }
+    var body = {
+      title: document.getElementById('ntf-title').value.trim() || null,
+      content: content,
+      sourceLanguage: srcLang,
+      targetType: document.getElementById('ntf-target-type').value,
+      targetId: targetId,
+      triggerType: triggerType,
+      scheduleAt: triggerType === 'once' && document.getElementById('ntf-schedule-at').value
+        ? new Date(document.getElementById('ntf-schedule-at').value).toISOString() : null,
+      cronExpr: triggerType === 'cron' ? (document.getElementById('ntf-cron').value.trim() || null) : null
+    };
+    api('/api/notifications', 'POST', body)
+      .then(function () { toast('通知已创建', true); loadNotifications(); })
+      .catch(function (e) { toast('创建失败：' + e.message, false); });
+  }
+
+  function loadNotifications() {
+    api('/api/notifications')
+      .then(function (list) {
+        var rows = (list || []).map(function (n) {
+          var target = (n.targetType === 'group' ? '群组:' : '设备:') + escapeHtml(n.targetId);
+          var trigger = n.triggerType === 'cron' ? '周期 ' + escapeHtml(n.cronExpr || '') : '单次 ' + fmtTime(n.scheduleAt);
+          var actions = '<button class="small secondary" onclick="showDeliveries(' + n.id + ')">投递</button> ';
+          if (n.status === 'scheduled') actions += '<button class="small danger" onclick="cancelNotification(' + n.id + ')">取消</button>';
+          return '<tr>'
+            + '<td>' + escapeHtml(n.title || '—') + '</td>'
+            + '<td>' + escapeHtml(shortJson(n.content)) + '</td>'
+            + '<td>' + escapeHtml(n.sourceLanguage) + '</td>'
+            + '<td>' + target + '</td>'
+            + '<td>' + trigger + '</td>'
+            + '<td>' + fmtTime(n.scheduleAt) + '</td>'
+            + '<td>' + badge(NTF_STATUS, n.status) + '</td>'
+            + '<td>' + fmtTime(n.createdAt) + '</td>'
+            + '<td><div class="row-actions">' + actions + '</div></td>'
+            + '</tr>';
+        }).join('');
+        setTbody('ntf-tbody', rows, 'ntf-empty', (list || []).length);
+      })
+      .catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+
+  function cancelNotification(id) {
+    api('/api/notifications/' + id + '/cancel', 'POST')
+      .then(function () { toast('通知已取消', true); loadNotifications(); })
+      .catch(function (e) { toast('取消失败：' + e.message, false); });
+  }
+
+  function showDeliveries(id) {
+    api('/api/notifications/' + id + '/deliveries')
+      .then(function (list) {
+        var rows = (list && list.length)
+          ? '<table><thead><tr><th>设备ID</th><th>译文</th><th>目标语言</th><th>投递时间</th></tr></thead><tbody>'
+            + list.map(function (d) {
+                return '<tr><td class="mono">' + escapeHtml(d.deviceId) + '</td>'
+                  + '<td>' + escapeHtml(d.translatedText) + '</td>'
+                  + '<td>' + escapeHtml(d.targetLanguage) + '</td>'
+                  + '<td>' + fmtTime(d.deliveredAt) + '</td></tr>';
+              }).join('')
+            + '</tbody></table>'
+          : '<div class="empty">暂无投递回执</div>';
+        openModal('<h3>通知投递回执</h3>' + rows);
+      })
+      .catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+
+  // ==================== 维修单 ====================
+  function createOrder() {
+    var no = document.getElementById('ord-no').value.trim();
+    var title = document.getElementById('ord-title').value.trim();
+    if (!no || !title) { toast('请填写维修单号与标题', false); return; }
+    var body = {
+      orderNo: no, title: title,
+      deviceId: document.getElementById('ord-device').value.trim() || null,
+      description: document.getElementById('ord-desc').value.trim() || null,
+      reporter: document.getElementById('ord-reporter').value.trim() || null
+    };
+    api('/api/maintenance/orders', 'POST', body)
+      .then(function () { toast('维修单已创建', true); loadOrders(); })
+      .catch(function (e) { toast('创建失败：' + e.message, false); });
+  }
+
+  function loadOrders() {
+    var status = document.getElementById('ord-filter').value;
+    var q = status ? '?status=' + status : '';
+    api('/api/maintenance/orders' + q)
+      .then(function (list) {
+        var rows = (list || []).map(function (o) {
+          var actions = '';
+          if (o.status === 'open') {
+            actions += '<button class="small primary" onclick="transitionOrder(' + o.id + ',\'processing\')">开始处理</button> ';
+            actions += '<button class="small danger" onclick="transitionOrder(' + o.id + ',\'cancelled\')">取消</button>';
+          } else if (o.status === 'processing') {
+            actions += '<button class="small primary" onclick="transitionOrder(' + o.id + ',\'done\')">完成</button> ';
+            actions += '<button class="small danger" onclick="transitionOrder(' + o.id + ',\'cancelled\')">取消</button>';
+          } else {
+            actions = '<span class="badge gray">终态</span>';
+          }
+          return '<tr>'
+            + '<td class="mono">' + escapeHtml(o.orderNo) + '</td>'
+            + '<td class="mono">' + escapeHtml(o.deviceId || '—') + '</td>'
+            + '<td>' + escapeHtml(o.title) + '</td>'
+            + '<td>' + escapeHtml(shortJson(o.description)) + '</td>'
+            + '<td>' + badge(ORDER_STATUS, o.status) + '</td>'
+            + '<td>' + escapeHtml(o.reporter || '—') + '</td>'
+            + '<td>' + fmtTime(o.createdAt) + '</td>'
+            + '<td><div class="row-actions">' + actions + '</div></td>'
+            + '</tr>';
+        }).join('');
+        setTbody('ord-tbody', rows, 'ord-empty', (list || []).length);
+      })
+      .catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+
+  function transitionOrder(id, target) {
+    api('/api/maintenance/orders/' + id + '/transition', 'POST', { status: target })
+      .then(function () { toast('已流转为 ' + target, true); loadOrders(); })
+      .catch(function (e) { toast('流转失败：' + e.message, false); });
+  }
+
+  // ==================== 点检任务 ====================
+  function createTask() {
+    var no = document.getElementById('ins-no').value.trim();
+    var title = document.getElementById('ins-title').value.trim();
+    var checklist = document.getElementById('ins-checklist').value.trim();
+    if (!no || !title || !checklist) { toast('请填写任务号、标题与点检清单', false); return; }
+    var body = {
+      taskNo: no, title: title, checklist: checklist,
+      deviceId: document.getElementById('ins-device').value.trim() || null,
+      scheduledDate: document.getElementById('ins-date').value || null,
+      assignee: document.getElementById('ins-assignee').value.trim() || null
+    };
+    api('/api/inspection/tasks', 'POST', body)
+      .then(function () { toast('点检任务已创建', true); loadTasks(); })
+      .catch(function (e) { toast('创建失败：' + e.message, false); });
+  }
+
+  function loadTasks() {
+    var status = document.getElementById('ins-filter').value;
+    var q = status ? '?status=' + status : '';
+    api('/api/inspection/tasks' + q)
+      .then(function (list) {
+        var rows = (list || []).map(function (t) {
+          var actions = '<button class="small secondary" onclick="showRecords(' + t.id + ')">记录</button> ';
+          if (t.status === 'pending' || t.status === 'done') {
+            actions += '<button class="small primary" onclick="openRecordForm(' + t.id + ')">提交点检</button> ';
+          }
+          if (t.status === 'done') {
+            actions += '<button class="small secondary" onclick="closeTask(' + t.id + ')">关闭</button>';
+          }
+          return '<tr>'
+            + '<td class="mono">' + escapeHtml(t.taskNo) + '</td>'
+            + '<td class="mono">' + escapeHtml(t.deviceId || '—') + '</td>'
+            + '<td>' + escapeHtml(t.title) + '</td>'
+            + '<td class="mono" title="' + escapeHtml(t.checklist) + '">' + escapeHtml(shortJson(t.checklist)) + '</td>'
+            + '<td>' + badge(TASK_STATUS, t.status) + '</td>'
+            + '<td>' + escapeHtml(t.scheduledDate || '—') + '</td>'
+            + '<td>' + escapeHtml(t.assignee || '—') + '</td>'
+            + '<td><div class="row-actions">' + actions + '</div></td>'
+            + '</tr>';
+        }).join('');
+        setTbody('ins-tbody', rows, 'ins-empty', (list || []).length);
+      })
+      .catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+
+  function closeTask(id) {
+    api('/api/inspection/tasks/' + id + '/close', 'POST')
+      .then(function () { toast('任务已关闭', true); loadTasks(); })
+      .catch(function (e) { toast('关闭失败：' + e.message, false); });
+  }
+
+  function showRecords(id) {
+    api('/api/inspection/tasks/' + id + '/records')
+      .then(function (list) {
+        var rows = (list && list.length)
+          ? '<table><thead><tr><th>设备ID</th><th>结果</th><th>状态</th><th>点检人</th><th>点检时间</th><th>备注</th></tr></thead><tbody>'
+            + list.map(function (r) {
+                return '<tr><td class="mono">' + escapeHtml(r.deviceId) + '</td>'
+                  + '<td class="mono">' + escapeHtml(r.results) + '</td>'
+                  + '<td>' + escapeHtml(r.status) + '</td>'
+                  + '<td>' + escapeHtml(r.inspectedBy) + '</td>'
+                  + '<td>' + fmtTime(r.inspectedAt) + '</td>'
+                  + '<td>' + escapeHtml(r.note || '—') + '</td></tr>';
+              }).join('')
+            + '</tbody></table>'
+          : '<div class="empty">暂无点检记录</div>';
+        openModal('<h3>点检记录</h3>' + rows);
+      })
+      .catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+
+  function openRecordForm(id) {
+    var html = '<h3>提交点检记录</h3>'
+      + '<div class="form-grid" style="grid-template-columns:1fr;">'
+      + '<div class="field"><label>设备ID</label><input id="rec-device"></div>'
+      + '<div class="field"><label>结果 (JSON)</label><textarea id="rec-results">{"外观": "正常", "扬声器": "正常"}</textarea><div class="hint">JSON 格式，记录各项点检结果</div></div>'
+      + '<div class="field"><label>点检人</label><input id="rec-by"></div>'
+      + '<div class="field"><label>备注</label><input id="rec-note"></div>'
+      + '<div class="field"><button class="primary" onclick="submitRecord(' + id + ')">提交</button></div>'
+      + '</div>';
+    openModal(html);
+  }
+
+  function submitRecord(id) {
+    var body = {
+      deviceId: document.getElementById('rec-device').value.trim() || null,
+      results: document.getElementById('rec-results').value.trim(),
+      inspectedBy: document.getElementById('rec-by').value.trim() || null,
+      note: document.getElementById('rec-note').value.trim() || null
+    };
+    api('/api/inspection/tasks/' + id + '/records', 'POST', body)
+      .then(function () { closeModal(); toast('点检记录已提交', true); loadTasks(); })
+      .catch(function (e) { toast('提交失败：' + e.message, false); });
+  }
+
+  // ---------- modal ----------
+  function openModal(html) {
+    document.getElementById('modal-body').innerHTML = html;
+    document.getElementById('modal-mask').classList.add('open');
+  }
+  function closeModal() {
+    document.getElementById('modal-mask').classList.remove('open');
+  }
+  document.getElementById('modal-mask').addEventListener('click', function (e) {
+    if (e.target === this) closeModal();
+  });
+
+  // ---------- 初始加载 ----------
+  loadReports();
+</script>
+</body>
+</html>
