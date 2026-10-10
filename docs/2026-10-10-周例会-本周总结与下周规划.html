@@ -1,0 +1,71 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>周例会 · 本周工作总结与下周规划</title><style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.6; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 18pt; font-weight: 700;
+       text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 14pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+h3 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 12pt; font-weight: 700;
+       color: #1a3c6e; margin: 12pt 0 4pt; }
+p { margin: 3pt 0; }
+blockquote { margin: 6pt 0; padding: 6pt 10pt; background: #f4f7fb; border-left: 3px solid #2b6cb0; color: #333; }
+ul, ol { margin: 4pt 0; padding-left: 0; list-style: none; }
+li { margin: 0 0 4pt; padding-left: 12pt; text-indent: -12pt; }
+li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+ol { counter-reset: item; }
+ol li { counter-increment: item; }
+ol li::before { content: counter(item) '. '; color: #2b6cb0; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 5pt 0 10pt; font-size: 9pt; }
+th, td { border: 1px solid #b9c4d4; padding: 4pt 7pt; vertical-align: top; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+code { font-family: 'Menlo', 'Monaco', monospace; background: #f0f2f5; padding: 0 3px; border-radius: 3px; font-size: 9.5pt; }
+hr { border: none; border-top: 1px solid #e0e5ec; margin: 12pt 0; }
+b { font-weight: 700; }
+pre { background: #f6f8fa; border: 1px solid #e0e5ec; border-radius: 4px; padding: 8pt 10pt;
+      overflow-x: auto; margin: 6pt 0; white-space: pre-wrap; }
+pre code { background: none; padding: 0; font-size: 8.5pt; }
+</style></head><body><div class='doctitle'>周例会 · 本周工作总结与下周规划</div>
+<div class='subtitle'>日期：2026-10-10<br>范围：云端后端（姜华团队）</div>
+<hr>
+<h2>一、本周完成</h2>
+<h3>1. OTA 联调走通并发布 ✅</h3>
+<ul>
+<li>端侧按《OTA 联调操作说明》走完整流程：发布 → check → 下载 → 升级，<b>已与端侧联调通过</b></li>
+<li>外网 HTTPS 58083 → 内网 8083 映射就绪，OTA 服务已可对外使用</li>
+<li>说明：OTA 服务与联调文档已于 09-23 / 09-24 交付，本周完成端侧联调验证（代码侧无新增提交）</li>
+</ul>
+<h3>2. 其他：国庆假期（10-01 ~ 10-07）</h3>
+<ul>
+<li>后端两条排期功能、到岗登记、周报/月报等尚未开工，转入下周</li>
+</ul>
+<h2>二、下周规划</h2>
+<h3>1. 服务人员周报 / 月报（新增）</h3>
+<ul>
+<li>给每个使用工牌的服务人员定时生成周报、月报</li>
+<li>定位衔接：这是「AI 工牌 = 一线员工 agent 助手」定位下，<b>数据采集价值的第一个落点</b>——把工牌采集的会话 / 问答 / 翻译数据按人聚合为周报 / 月报，服务团队管理</li>
+<li>统计口径、产出形式（后台看板 / 推送 / 文档导出）待会上确认</li>
+</ul>
+<h3>2. 后端两条功能排期开工</h3>
+<ul>
+<li>主动推送「定时轮询 + 后台可配」</li>
+<li>制造维修上报 + 点检闭环</li>
+</ul>
+<h3>3. Backlog 待办</h3>
+<ul>
+<li>语言漂移防漂移（真机联调后评估）</li>
+<li>劳务派遣「到岗登记」落地（1.0 最小范围）</li>
+</ul>
+<h3>4. 硬件侧配合</h3>
+<ul>
+<li>10/20 EVT 样机前的软件配合（LED / 按键业务逻辑测试用例评审）</li>
+</ul>
+<h2>三、需协调 / 风险</h2>
+<table><thead><tr><th>项</th><th>说明</th></tr></thead><tbody>
+<tr><td>EVT 样机</td><td>10/20 交付临近，声音质量 70–80%（泡棉迭代 + 耳麦兜底）</td></tr>
+<tr><td>周报 / 月报</td><td>统计口径、产出形式、数据范围需会上敲定</td></tr>
+<tr><td>后端两条功能</td><td>优先级与排期需会上确认（当前「已采纳、未实现」）</td></tr>
+</tbody></table>
+</body></html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'><title>周例会 · 本周工作总结与下周规划</title><style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.6; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 18pt; font-weight: 700;
+       text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 14pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+h3 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 12pt; font-weight: 700;
+       color: #1a3c6e; margin: 12pt 0 4pt; }
+p { margin: 3pt 0; }
+blockquote { margin: 6pt 0; padding: 6pt 10pt; background: #f4f7fb; border-left: 3px solid #2b6cb0; color: #333; }
+ul, ol { margin: 4pt 0; padding-left: 0; list-style: none; }
+li { margin: 0 0 4pt; padding-left: 12pt; text-indent: -12pt; }
+li::before { content: '· '; color: #2b6cb0; font-weight: 700; }
+ol { counter-reset: item; }
+ol li { counter-increment: item; }
+ol li::before { content: counter(item) '. '; color: #2b6cb0; font-weight: 700; }
+table { border-collapse: collapse; width: 100%; margin: 5pt 0 10pt; font-size: 9pt; }
+th, td { border: 1px solid #b9c4d4; padding: 4pt 7pt; vertical-align: top; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+code { font-family: 'Menlo', 'Monaco', monospace; background: #f0f2f5; padding: 0 3px; border-radius: 3px; font-size: 9.5pt; }
+hr { border: none; border-top: 1px solid #e0e5ec; margin: 12pt 0; }
+b { font-weight: 700; }
+pre { background: #f6f8fa; border: 1px solid #e0e5ec; border-radius: 4px; padding: 8pt 10pt;
+      overflow-x: auto; margin: 6pt 0; white-space: pre-wrap; }
+pre code { background: none; padding: 0; font-size: 8.5pt; }
+</style></head><body><div class='doctitle'>周例会 · 本周工作总结与下周规划</div>
+<div class='subtitle'>日期：2026-09-24<br>范围：云端后端（姜华团队）</div>
+<hr>
+<h2>一、本周完成</h2>
+<blockquote>上周会（09-16）明确的两项云端待办 —— <b>OTA 搭建</b>与<b>日本劳工派遣行业梳理</b> —— 本周均已完成。</blockquote>
+<h3>1. OTA 云端服务（本周计划重点，完整交付 ✅）</h3>
+<table><thead><tr><th>阶段</th><th>结果</th></tr></thead><tbody><tr><td>协议</td><td>评审端侧初稿 → 冻结《OTA 协议确认端云冻结版》；定稿「独立 HTTPS check + 签名下载」，废弃 config_update 下发</td></tr><tr><td>开发</td><td><code>com.aicard.ota</code> 模块：发布/检查更新/签名下载三接口 + HMAC 签名 + Flyway V11 + Device 档案扩展（型号/硬件版本/双芯片版本），13 单测全绿</td></tr><tr><td>验证</td><td>本地端到端 12 场景模拟通过（发布→check→下载→撤销 + 鉴权/签名/负向）</td></tr><tr><td>上线</td><td>独立容器 <code>aicard-ota</code>（内网 8083，外网 HTTPS 58083 待运维映射）</td></tr><tr><td>文档</td><td>《OTA 联调操作说明》md/html/pdf/docx 四格式，已发测试/端侧</td></tr></tbody></table>
+<h3>2. 产品定位与商务文档</h3>
+<ul><li>「成事 vs 防人」定位细化到各行业业务场景（含劳工派遣制造/餐饮/农业/介护/清扫分行业）</li><li>《主动与执行远景 · 落地可行性分析》报告（docx/pdf）</li><li>《客户推介 · 分行业》《投资人推介》两份</li><li>《BP 与产品现状对齐核对表》+ BP 两处调整内容（准确率 100% / 成人硬件背景）</li><li>测试 9 条建议确认 + 回复文档（考勤→「到岗登记」、老人陪伴设备→单独立项）</li></ul>
+<h3>3. demo 与硬件规格</h3>
+<ul><li>demo 文案按「成事」细化：酒店叫车/查空房→工单转总台、免税删开退税单→知识库问答、机场去航司增值→转机规则</li><li>硬件规格对齐：1500mAh、4 麦阵列、彩屏+方向键+确认键、ESP32 三芯片、独立问答键</li></ul>
+<hr>
+<h2>二、下周规划</h2>
+<h3>1. OTA 联调收尾（本周已上线，下周跑通）</h3>
+<ul><li>运维：外网 58083 → 内网 8083 映射 + HTTPS 证书（域名 or 自签预埋）</li><li>端侧：放真实 <code>.bin</code> + 按联调文档走完整流程</li><li>核对公网 IP（<code>.108</code>/<code>.110</code>/<code>.100</code> 待确认）</li></ul>
+<h3>2. 后端两条功能排期（已采纳、未实现）</h3>
+<ul><li>主动推送「定时轮询 + 后台可配」</li><li>制造维修上报 + 点检闭环</li></ul>
+<h3>3. Backlog 待办</h3>
+<ul><li>品牌词表 / 白名单后台可配（当前仅静态配置）</li><li>语言漂移防漂移（真机联调后评估）</li><li>劳务派遣「到岗登记」落地（1.0 最小范围）</li><li>老人陪伴设备单独立项（Backlog）</li></ul>
+<h3>4. 硬件侧配合</h3>
+<ul><li>10/20 EVT 样机前的软件配合（LED / 按键业务逻辑测试用例评审）</li></ul>
+<hr>
+<h2>三、需协调 / 风险</h2>
+<table><thead><tr><th>项</th><th>说明</th></tr></thead><tbody><tr><td>OTA 公网地址</td><td>IP 与证书需运维确认，本周已留接口，改 env 重启即生效</td></tr><tr><td>EVT 样机</td><td>10/20 交付，声音质量 70–80%（泡棉 3–4 次迭代 + 耳麦兜底）</td></tr><tr><td>样机备料</td><td>ESP32/P4/C5 已下达 3000 台 forecast 预订单（备料周期 12 周）</td></tr></tbody></table></body></html>
