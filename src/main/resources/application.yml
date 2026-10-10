@@ -1,5 +1,9 @@
 app:
   role: ${APP_ROLE:kb}
+  schedule:
+    report-weekly-cron: "0 0 8 * * MON"
+    report-monthly-cron: "0 0 8 1 * *"
+    push-poll-ms: 30000
 
 spring:
   application:
