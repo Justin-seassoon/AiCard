@@ -8,22 +8,17 @@ import com.aicard.broadcast.repository.DeviceGroupMemberRepository;
 import com.aicard.broadcast.repository.DeviceGroupRepository;
 import com.aicard.common.domain.Device;
 import com.aicard.common.repository.DeviceRepository;
-import com.aicard.gateway.protocol.AudioFrameCodec;
 import com.aicard.gateway.protocol.OutboundMessage;
-import com.aicard.gateway.protocol.TtsAudioFrame;
+import com.aicard.gateway.push.DevicePusher;
 import com.aicard.gateway.state.DeviceConnectionRegistry;
 import com.aicard.provider.api.SpeechProvider;
 import com.aicard.skb.provider.LLMProvider;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.socket.BinaryMessage;
-import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,11 +28,11 @@ import java.util.stream.Collectors;
 /**
  * 广播编排：源文本 → 按成员目标语言去重翻译 + TTS → 落投递记录 → 在线设备实时推、离线设备留待补拉。
  * 同语言只翻译/TTS 一次（省成本）；离线补拉时按已存译文重新合成 TTS（不落音频存储）。
+ * 底层 socket/TTS 分片委托 {@link DevicePusher}（与运营通知共用）。
  */
 @Service
 public class BroadcastService {
 
-    private static final int CHUNK_SIZE = 8000;
     private static final String DEFAULT_LANG = "ja-JP";
 
     private final DeviceGroupRepository groups;
@@ -48,12 +43,12 @@ public class BroadcastService {
     private final LLMProvider llm;
     private final SpeechProvider speech;
     private final DeviceConnectionRegistry connections;
-    private final ObjectMapper mapper;
+    private final DevicePusher pusher;
 
     public BroadcastService(DeviceGroupRepository groups, DeviceGroupMemberRepository members,
                             BroadcastRepository broadcasts, BroadcastDeliveryRepository deliveries,
                             DeviceRepository devices, LLMProvider llm, SpeechProvider speech,
-                            DeviceConnectionRegistry connections, ObjectMapper mapper) {
+                            DeviceConnectionRegistry connections, DevicePusher pusher) {
         this.groups = groups;
         this.members = members;
         this.broadcasts = broadcasts;
@@ -62,7 +57,7 @@ public class BroadcastService {
         this.llm = llm;
         this.speech = speech;
         this.connections = connections;
-        this.mapper = mapper;
+        this.pusher = pusher;
     }
 
     public Broadcast broadcast(Long groupId, String sourceText, String sourceLanguage,
@@ -142,20 +137,10 @@ public class BroadcastService {
     }
 
     private boolean push(WebSocketSession session, Long broadcastId, String text, String targetLang, byte[] tts) {
-        try {
-            session.sendMessage(new TextMessage(mapper.writeValueAsString(OutboundMessage.builder()
-                    .type("broadcast").broadcastId(broadcastId).text(text).targetLanguage(targetLang).build())));
-            for (int off = 0; off < tts.length; off += CHUNK_SIZE) {
-                int len = Math.min(CHUNK_SIZE, tts.length - off);
-                session.sendMessage(new BinaryMessage(AudioFrameCodec.encodeTtsAudio(
-                        new TtsAudioFrame("bc" + broadcastId, Arrays.copyOfRange(tts, off, off + len)))));
-            }
-            session.sendMessage(new TextMessage(mapper.writeValueAsString(OutboundMessage.builder()
-                    .type("tts_end").turnId("bc" + broadcastId).build())));
-            return true;
-        } catch (Exception e) {
-            return false;
-        }
+        return pusher.send(session,
+                OutboundMessage.builder().type("broadcast").broadcastId(broadcastId)
+                        .text(text).targetLanguage(targetLang).build(),
+                tts, "bc" + broadcastId);
     }
 
     private String lang(String staffLanguage) {

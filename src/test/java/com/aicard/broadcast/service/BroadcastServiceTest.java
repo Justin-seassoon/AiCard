@@ -9,14 +9,13 @@ import com.aicard.broadcast.repository.DeviceGroupMemberRepository;
 import com.aicard.broadcast.repository.DeviceGroupRepository;
 import com.aicard.common.domain.Device;
 import com.aicard.common.repository.DeviceRepository;
+import com.aicard.gateway.protocol.OutboundMessage;
+import com.aicard.gateway.push.DevicePusher;
 import com.aicard.gateway.state.DeviceConnectionRegistry;
 import com.aicard.provider.api.SpeechProvider;
 import com.aicard.skb.provider.LLMProvider;
-import com.aicard.gateway.protocol.OutboundMessage;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.util.List;
@@ -25,7 +24,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.atLeast;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -41,10 +40,10 @@ class BroadcastServiceTest {
     private final LLMProvider llm = mock(LLMProvider.class);
     private final SpeechProvider speech = mock(SpeechProvider.class);
     private final DeviceConnectionRegistry connections = mock(DeviceConnectionRegistry.class);
-    private final ObjectMapper mapper = new ObjectMapper();
+    private final DevicePusher pusher = mock(DevicePusher.class);
 
     private final BroadcastService service = new BroadcastService(
-            groups, members, broadcasts, deliveries, devices, llm, speech, connections, mapper);
+            groups, members, broadcasts, deliveries, devices, llm, speech, connections, pusher);
 
     @Test
     void translatesAndSynthesizesPerLanguageNotPerMember() {
@@ -96,13 +95,13 @@ class BroadcastServiceTest {
     }
 
     @Test
-    void broadcastTtsEndCarriesTurnId() throws Exception {
+    void broadcastPushesViaPusherWithTurnId() {
         DeviceGroup group = DeviceGroup.builder().id(1L).code("site1").name("工地1")
                 .customerId(10L).storeId(20L).build();
         when(groups.findByIdAndCustomerIdAndStoreId(1L, 10L, 20L)).thenReturn(Optional.of(group));
         when(members.findByGroupId(1L)).thenReturn(List.of(member(1L, "dev-a")));
         when(devices.findByDeviceId("dev-a")).thenReturn(Optional.of(device("dev-a", "ja-JP")));
-        when(speech.synthesize(anyString(), anyString())).thenReturn(new byte[9000]); // >8KB，分 2 片
+        when(speech.synthesize(anyString(), anyString())).thenReturn(new byte[9000]);
         when(broadcasts.save(any())).thenAnswer(inv -> {
             Broadcast b = inv.getArgument(0);
             b.setId(100L);
@@ -112,23 +111,13 @@ class BroadcastServiceTest {
         WebSocketSession session = mock(WebSocketSession.class);
         when(connections.findOnline("dev-a")).thenReturn(Optional.of(session));
 
-        ArgumentCaptor<TextMessage> textCaptor = ArgumentCaptor.forClass(TextMessage.class);
-
         service.broadcast(1L, "安全须知", "ja-JP", 10L, 20L);
 
-        verify(session, atLeast(2)).sendMessage(textCaptor.capture());
-        OutboundMessage ttsEnd = null;
-        for (TextMessage m : textCaptor.getAllValues()) {
-            try {
-                OutboundMessage out = mapper.readValue(m.getPayload(), OutboundMessage.class);
-                if ("tts_end".equals(out.type())) {
-                    ttsEnd = out;
-                }
-            } catch (Exception ignored) {
-            }
-        }
-        assertThat(ttsEnd).isNotNull();
-        assertThat(ttsEnd.turnId()).isEqualTo("bc100"); // 广播 tts_end 带 turnId，端侧据此关联
+        ArgumentCaptor<OutboundMessage> msgCaptor = ArgumentCaptor.forClass(OutboundMessage.class);
+        ArgumentCaptor<String> turnIdCaptor = ArgumentCaptor.forClass(String.class);
+        verify(pusher).send(eq(session), msgCaptor.capture(), any(byte[].class), turnIdCaptor.capture());
+        assertThat(msgCaptor.getValue().type()).isEqualTo("broadcast");
+        assertThat(turnIdCaptor.getValue()).isEqualTo("bc100");
     }
 
     private DeviceGroupMember member(Long id, String deviceId) {

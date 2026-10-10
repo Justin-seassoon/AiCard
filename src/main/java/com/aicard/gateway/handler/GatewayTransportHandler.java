@@ -14,6 +14,7 @@ import com.aicard.gateway.session.SessionContext;
 import com.aicard.gateway.session.SessionManager;
 import com.aicard.gateway.state.DeviceConnectionRegistry;
 import com.aicard.gateway.state.DeviceStateTracker;
+import com.aicard.notification.service.NotificationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,16 +44,19 @@ public class GatewayTransportHandler extends AbstractWebSocketHandler {
     private final DeviceStateTracker states;
     private final DeviceConnectionRegistry connections;
     private final BroadcastService broadcasts;
+    private final NotificationService notifications;
 
     public GatewayTransportHandler(ObjectMapper mapper, SessionManager sessions,
                                    GatewayWebSocketHandler router, DeviceStateTracker states,
-                                   DeviceConnectionRegistry connections, BroadcastService broadcasts) {
+                                   DeviceConnectionRegistry connections, BroadcastService broadcasts,
+                                   NotificationService notifications) {
         this.mapper = mapper;
         this.sessions = sessions;
         this.router = router;
         this.states = states;
         this.connections = connections;
         this.broadcasts = broadcasts;
+        this.notifications = notifications;
     }
 
     @Override
@@ -120,6 +124,7 @@ public class GatewayTransportHandler extends AbstractWebSocketHandler {
         session.getAttributes().put(ATTR_SESSION, ctx);
         states.markOnline(device.getDeviceId());
         broadcasts.deliverPending(device.getDeviceId());
+        notifications.deliverPending(device.getDeviceId());
     }
 
     private SessionContext requireSession(WebSocketSession session) {
