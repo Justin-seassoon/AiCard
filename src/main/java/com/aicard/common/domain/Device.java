@@ -28,6 +28,12 @@ public class Device {
     @Column(name = "staff_language", length = 16)
     private String staffLanguage;
 
+    @Column(name = "staff_name", length = 64)
+    private String staffName;
+
+    @Column(name = "staff_no", length = 64)
+    private String staffNo;
+
     @Column(name = "product_model", length = 32)
     private String productModel;
 

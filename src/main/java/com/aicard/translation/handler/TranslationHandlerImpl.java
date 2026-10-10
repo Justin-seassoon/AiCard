@@ -6,6 +6,7 @@ import com.aicard.gateway.protocol.InboundMessage;
 import com.aicard.gateway.protocol.OutboundMessage;
 import com.aicard.gateway.protocol.TtsAudioFrame;
 import com.aicard.gateway.session.SessionContext;
+import com.aicard.ingestion.model.QaLog;
 import com.aicard.ingestion.model.TranslationSample;
 import com.aicard.ingestion.service.IngestionService;
 import com.aicard.provider.api.ProviderException;
@@ -193,6 +194,10 @@ public class TranslationHandlerImpl implements TranslationHandler {
                     pendingVkbs.put(ctx.sessionId(),
                             new PendingVkb(ctx, turnId, vkb.answer(), originalTts, visitor, timeout));
                     vkbHit = true;
+                    ingestion.recordQa(new QaLog(
+                            ctx.customerId(), ctx.storeId(), ctx.deviceId(), ctx.sessionId(), turnId,
+                            "vkb", result.translatedText(), vkb.answer(), vkb.status(),
+                            vkb.sourceRefs() == null ? null : String.join(",", vkb.sourceRefs())));
                 }
             }
 
@@ -299,7 +304,7 @@ public class TranslationHandlerImpl implements TranslationHandler {
     private void recordSample(SessionContext ctx, InboundMessage msg, SpeechTranslationResult result,
                               String srcLang, String tgtLang, Double lidConfidence) {
         ingestion.record(new TranslationSample(
-                ctx.customerId(), ctx.storeId(), ctx.sessionId(), msg.turnId(),
+                ctx.customerId(), ctx.storeId(), ctx.deviceId(), ctx.sessionId(), msg.turnId(),
                 srcLang, tgtLang, result.finalText(), result.translatedText(),
                 lidConfidence, msg.sourceSide()));
     }

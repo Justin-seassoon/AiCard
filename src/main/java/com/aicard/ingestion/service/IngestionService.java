@@ -1,12 +1,13 @@
 package com.aicard.ingestion.service;
 
+import com.aicard.ingestion.model.QaLog;
 import com.aicard.ingestion.model.TranslationSample;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 /**
- * 旁路样本采集：翻译结果脱敏后异步落库。绝不阻塞翻译主链路，失败静默降级。
+ * 旁路样本采集：翻译结果与问答记录脱敏后异步落库。绝不阻塞翻译主链路，失败静默降级。
  * demo 默认只存脱敏文本，原始音频不采集。
  */
 @Service
@@ -22,15 +23,30 @@ public class IngestionService {
     public void record(TranslationSample sample) {
         try {
             jdbc.update(
-                    "INSERT INTO translation_sample(customer_id, store_id, session_id, turn_id, " +
+                    "INSERT INTO translation_sample(customer_id, store_id, device_id, session_id, turn_id, " +
                     "src_lang, tgt_lang, source_text, translated_text, lid_confidence, source_side) " +
-                    "VALUES (?,?,?,?,?,?,?,?,?,?)",
-                    sample.customerId(), sample.storeId(), sample.sessionId(), sample.turnId(),
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                    sample.customerId(), sample.storeId(), sample.deviceId(), sample.sessionId(), sample.turnId(),
                     sample.srcLang(), sample.tgtLang(),
                     sanitize(sample.sourceText()), sanitize(sample.translatedText()),
                     sample.lidConfidence(), sample.sourceSide());
         } catch (Exception e) {
             // 旁路失败静默降级，不影响翻译主链路
+        }
+    }
+
+    @Async
+    public void recordQa(QaLog log) {
+        try {
+            jdbc.update(
+                    "INSERT INTO qa_log(customer_id, store_id, device_id, session_id, turn_id, " +
+                    "source, question, answer, status, source_refs) " +
+                    "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                    log.customerId(), log.storeId(), log.deviceId(), log.sessionId(), log.turnId(),
+                    log.source(), sanitize(log.question()), sanitize(log.answer()),
+                    log.status(), log.sourceRefs());
+        } catch (Exception e) {
+            // 旁路失败静默降级
         }
     }
 

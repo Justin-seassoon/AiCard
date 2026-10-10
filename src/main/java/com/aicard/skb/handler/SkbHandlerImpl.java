@@ -6,6 +6,8 @@ import com.aicard.gateway.protocol.InboundMessage;
 import com.aicard.gateway.protocol.OutboundMessage;
 import com.aicard.gateway.protocol.TtsAudioFrame;
 import com.aicard.gateway.session.SessionContext;
+import com.aicard.ingestion.model.QaLog;
+import com.aicard.ingestion.service.IngestionService;
 import com.aicard.provider.api.ProviderException;
 import com.aicard.provider.api.SpeechProvider;
 import com.aicard.skb.model.SkbResult;
@@ -28,11 +30,13 @@ public class SkbHandlerImpl implements SkbHandler {
 
     private final SpeechProvider speech;
     private final SkbService service;
+    private final IngestionService ingestion;
     private final ConcurrentHashMap<String, ByteArrayOutputStream> buffers = new ConcurrentHashMap<>();
 
-    public SkbHandlerImpl(SpeechProvider speech, SkbService service) {
+    public SkbHandlerImpl(SpeechProvider speech, SkbService service, IngestionService ingestion) {
         this.speech = speech;
         this.service = service;
+        this.ingestion = ingestion;
     }
 
     @Override
@@ -55,6 +59,10 @@ public class SkbHandlerImpl implements SkbHandler {
         }
 
         SkbResult result = service.answer(question, ctx.customerId(), ctx.storeId(), "skb");
+        ingestion.recordQa(new QaLog(
+                ctx.customerId(), ctx.storeId(), ctx.deviceId(), ctx.sessionId(), turnId,
+                "skb", question, result.answer(), result.status(),
+                result.sourceRefs() == null ? null : String.join(",", result.sourceRefs())));
 
         byte[] tts;
         try {

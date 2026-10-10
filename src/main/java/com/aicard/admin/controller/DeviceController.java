@@ -42,6 +42,8 @@ public class DeviceController {
                 .storeId(t.storeId())
                 .token(UUID.randomUUID().toString())
                 .staffLanguage(req.staffLanguage())
+                .staffName(req.staffName())
+                .staffNo(req.staffNo())
                 .createdAt(Instant.now())
                 .build();
         return DeviceDto.from(devices.save(d));
