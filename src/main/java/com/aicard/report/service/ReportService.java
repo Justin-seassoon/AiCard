@@ -62,6 +62,12 @@ public class ReportService {
         return reports.findByDeviceIdAndPeriodTypeAndPeriodStart(deviceId, periodType, start);
     }
 
+    /** 临时聚合（不落快照），供导出用；{@code deviceId} 可空 = 租户级（C4）。 */
+    public DeviceAggregate aggregate(Long customerId, Long storeId, String deviceId,
+                                     LocalDate start, LocalDate end) {
+        return query.aggregate(customerId, storeId, deviceId, start, end);
+    }
+
     public List<DeviceUsageReport> list(Long customerId, Long storeId, String periodType,
                                         LocalDate start, LocalDate end) {
         if (start != null && end != null) {

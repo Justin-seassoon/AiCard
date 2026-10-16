@@ -21,6 +21,7 @@
     <java.version>17</java.version>
     <testcontainers.version>2.0.5</testcontainers.version>
     <pgvector.version>0.1.6</pgvector.version>
+    <poi.version>5.2.5</poi.version>
   </properties>
 
   <dependencies>
@@ -67,6 +68,12 @@
       <artifactId>pgvector</artifactId>
       <version>${pgvector.version}</version>
     </dependency>
+    <!-- 文档生成（③ 文档/文书处理）：xlsx（XSSF）与 docx（XWPF）共用 -->
+    <dependency>
+      <groupId>org.apache.poi</groupId>
+      <artifactId>poi-ooxml</artifactId>
+      <version>${poi.version}</version>
+    </dependency>
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
@@ -86,6 +93,13 @@
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>testcontainers-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <!-- Testcontainers 的 shaded docker-java 仍引用未 shade 的 commons-lang3，需显式提供 -->
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>3.14.0</version>
       <scope>test</scope>
     </dependency>
   </dependencies>
