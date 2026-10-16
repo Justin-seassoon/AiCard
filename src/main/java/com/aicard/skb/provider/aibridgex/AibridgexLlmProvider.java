@@ -40,6 +40,34 @@ public class AibridgexLlmProvider implements LLMProvider {
             翻訳結果だけを出力してください（説明や引用符は付けない）。
             """;
 
+    private static final String DRAFT_PROMPT = """
+            あなたはサービス業店舗の社内ナレッジ整備アシスタントです。
+            社員の質問に答えられなかった項目について、候補となる回答の下書きを作成してください。
+            規則：
+            1. 「参考資料」があればそれを根拠にしてください。
+            2. 参考資料に無い事項は断定的に書かず、確認が必要な箇所は「※要確認」と明記してください。
+            3. 出力は回答本文のみ（JSON・見出し・引用符・前置きは不要）。日本語で簡潔に。
+            """;
+
+    private static final String DRAFT_DOC_PROMPT = """
+            あなたは日本の企業の総務担当者を支援するアシスタントです。
+            指示に従って、社内文書の下書き（本文）を作成してください。
+            規則：
+            1. です・ます調の丁寧なビジネス文体で書いてください。
+            2. 指示にない事実を勝手に作らないでください。不明な点は「※要確認」と明記してください。
+            3. 本文のみを出力してください（見出し・前置き・引用符・JSONは不要）。
+            """;
+
+    private static final String PLAN_PROMPT = """
+            あなたは業務エージェントのプランナーです。
+            目標・利用可能なツール一覧・これまでの実行履歴から、次に呼ぶツールを 1 つだけ選んでください。
+            規則：
+            1. 出力は JSON オブジェクト 1 つだけ（他の文字は一切出さない）。
+            2. 形式：{"tool":"ツール名","args":{...}} または {"done":true}
+            3. 目標が達成されたら {"done":true} を出力してください。
+            4. 一覧にあるツール名だけを使ってください。
+            """;
+
     private final String baseUrl;
     private final String apiKey;
     private final String model;
@@ -109,6 +137,113 @@ public class AibridgexLlmProvider implements LLMProvider {
             return (String) message.get("content");
         } catch (Exception e) {
             throw new ProviderException("aibridgex translate failed", e);
+        }
+    }
+
+    @Override
+    public String draftAnswer(String question, List<RetrievedChunk> related) {
+        String url = baseUrl + "/chat/completions";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        StringBuilder ctx = new StringBuilder("参考資料：\n");
+        for (RetrievedChunk c : related) {
+            ctx.append("- ").append(c.text()).append('\n');
+        }
+        ctx.append("\n答えられなかった質問：").append(question);
+
+        Map<String, Object> body = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", DRAFT_PROMPT),
+                        Map.of("role", "user", "content", ctx.toString())));
+
+        try {
+            ResponseEntity<Map> resp = rest.postForEntity(url, new HttpEntity<>(body, headers), Map.class);
+            Map<String, Object> respBody = resp.getBody();
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) respBody.get("choices");
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            return (String) message.get("content");
+        } catch (Exception e) {
+            throw new ProviderException("aibridgex draft failed", e);
+        }
+    }
+
+    @Override
+    public String draftDocument(String instruction) {
+        String url = baseUrl + "/chat/completions";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", DRAFT_DOC_PROMPT),
+                        Map.of("role", "user", "content", instruction)));
+
+        try {
+            ResponseEntity<Map> resp = rest.postForEntity(url, new HttpEntity<>(body, headers), Map.class);
+            Map<String, Object> respBody = resp.getBody();
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) respBody.get("choices");
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            return (String) message.get("content");
+        } catch (Exception e) {
+            throw new ProviderException("aibridgex draftDocument failed", e);
+        }
+    }
+
+    @Override
+    public PlanStep planStep(String goal, List<String> toolSpecs, List<String> history) {
+        String url = baseUrl + "/chat/completions";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        String user = "目標：" + goal
+                + "\n利用可能なツール：\n- " + String.join("\n- ", toolSpecs)
+                + "\n実行履歴：\n- " + (history.isEmpty() ? "（なし）" : String.join("\n- ", history));
+
+        Map<String, Object> body = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", PLAN_PROMPT),
+                        Map.of("role", "user", "content", user)));
+
+        try {
+            ResponseEntity<Map> resp = rest.postForEntity(url, new HttpEntity<>(body, headers), Map.class);
+            Map<String, Object> respBody = resp.getBody();
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) respBody.get("choices");
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            return parsePlan((String) message.get("content"));
+        } catch (Exception e) {
+            throw new ProviderException("aibridgex planStep failed", e);
+        }
+    }
+
+    /** 容错解析规划输出：{"tool":..,"args":{..}} 或 {"done":true}；解析失败一律视为 done。 */
+    private PlanStep parsePlan(String content) {
+        String json = extractJson(content);
+        if (json == null) {
+            return PlanStep.finished();
+        }
+        try {
+            JsonNode node = mapper.readTree(json);
+            if (node.path("done").asBoolean(false)) {
+                return PlanStep.finished();
+            }
+            String tool = node.path("tool").asText("");
+            if (tool.isBlank()) {
+                return PlanStep.finished();
+            }
+            String args = node.has("args") ? node.get("args").toString() : "{}";
+            return PlanStep.tool(tool, args);
+        } catch (Exception e) {
+            return PlanStep.finished();
         }
     }
 
