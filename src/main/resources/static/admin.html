@@ -114,6 +114,9 @@
     <button class="tab" data-tab="notification">运营通知</button>
     <button class="tab" data-tab="order">维修单</button>
     <button class="tab" data-tab="inspection">点检任务</button>
+    <button class="tab" data-tab="gap">知识缺口</button>
+    <button class="tab" data-tab="docgen">社内文书</button>
+    <button class="tab" data-tab="agent">任务执行</button>
   </nav>
 
   <!-- ==================== 周报 / 月报 ==================== -->
@@ -145,6 +148,7 @@
         <div class="field"><label>结束日期</label><input id="rep-q-end" type="date"></div>
         <div class="field" style="display:flex;align-items:flex-end;">
           <button class="secondary" onclick="loadReports()">查询</button>
+          <button class="secondary" onclick="exportReportXlsx()">导出 Excel</button>
         </div>
       </div>
       <div class="table-wrap" style="margin-top:14px;">
@@ -291,6 +295,89 @@
       </div>
     </div>
   </section>
+
+  <!-- ==================== 知识缺口（自生长知识 ①） ==================== -->
+  <section id="panel-gap" class="panel">
+    <div class="card">
+      <h2>知识缺口</h2>
+      <p style="color:#6E685C;font-size:13px;margin:-4px 0 12px;">
+        来源：员工问答未命中（no_match）的聚合。经<b>人工审核</b>通过后才入库——不会自动写入知识库。
+      </p>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;">
+        <button class="primary" onclick="captureGaps()">触发器捕获（扫描 no_match）</button>
+        <button class="secondary" onclick="loadGaps()">刷新</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>问法</th><th>次数</th><th>状态</th><th>候选草稿</th><th>操作</th>
+          </tr></thead>
+          <tbody id="gap-tbody"></tbody>
+        </table>
+        <div class="empty" id="gap-empty" style="display:none;">暂无缺口（先在测试页问一条知识库未覆盖的问题，再点“触发器捕获”）</div>
+      </div>
+    </div>
+  <!-- ==================== 社内文书（③ 文档/文书处理） ==================== -->
+  <section id="panel-docgen" class="panel">
+    <div class="card">
+      <h2>社内文書 下書き作成</h2>
+      <p style="color:#6E685C;font-size:13px;margin:-4px 0 12px;">
+        AI が下書き（docx）を作成します。<b>送信・提出前に担当者が確認してください。</b>
+      </p>
+      <div class="form-grid">
+        <div class="field"><label>文書の種類</label>
+          <select id="doc-type">
+            <option value="通知">通知</option>
+            <option value="回覧">回覧</option>
+            <option value="報告">報告</option>
+          </select>
+        </div>
+        <div class="field full"><label>主題 <span class="req">*</span></label>
+          <input id="doc-topic" placeholder="例：来月の全社会議の開催について"></div>
+        <div class="field full"><label>要点</label>
+          <textarea id="doc-points" placeholder="例：日時 11/10 14:00、場所 本社会議室、出欠は 11/5 までに回答"></textarea></div>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="primary" onclick="generateBusinessDoc()">生成草稿（docx）</button>
+      </div>
+    </div>
+  <!-- ==================== 任务执行（② agent） ==================== -->
+  <section id="panel-agent" class="panel">
+    <div class="card">
+      <h2>多步任务执行</h2>
+      <p style="color:#6E685C;font-size:13px;margin:-4px 0 12px;">
+        agent 拆解任务、多步执行并交付文件——含<b>失败重试</b>与<b>确定性校验</b>（数字对账）。
+      </p>
+      <div class="form-grid">
+        <div class="field"><label>目标</label>
+          <select id="ag-goal">
+            <option value="alert_report">异常汇总报告（docx）</option>
+            <option value="usage_report">用量周报（xlsx）</option>
+          </select>
+        </div>
+        <div class="field"><label>规划方式</label>
+          <select id="ag-mode">
+            <option value="rule">规则工作流（稳定）</option>
+            <option value="llm">LLM 自主</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="primary" onclick="runAgentTask()">执行</button>
+        <button class="secondary" onclick="loadAgentTasks()">刷新</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>任务列表</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>目标</th><th>方式</th><th>状态</th><th>步骤</th><th>操作</th></tr></thead>
+          <tbody id="ag-tbody"></tbody>
+        </table>
+        <div class="empty" id="ag-empty" style="display:none;">暂无任务</div>
+      </div>
+    </div>
+  </section>
 </div>
 
 <!-- modal -->
@@ -351,7 +438,7 @@
       document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks };
+      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks, gap: loadGaps, docgen: function () {}, agent: loadAgentTasks };
       loader[btn.dataset.tab]();
     });
   });
@@ -365,6 +452,9 @@
   var ORDER_STATUS = { open: ['待处理', 'blue'], processing: ['处理中', 'orange'], done: ['已完成', 'green'], cancelled: ['已取消', 'gray'] };
   var TASK_STATUS = { pending: ['待点检', 'blue'], done: ['已点检', 'green'], closed: ['已关闭', 'gray'] };
   var NTF_STATUS = { scheduled: ['已排期', 'blue'], sent: ['已发送', 'green'], cancelled: ['已取消', 'gray'] };
+  var GAP_STATUS = { open: ['待处理', 'blue'], drafted: ['已起草', 'orange'], approved: ['已入库', 'green'], rejected: ['已驳回', 'gray'] };
+  var AGENT_STATUS = { pending: ['待执行', 'blue'], running: ['执行中', 'orange'], done: ['已完成', 'green'], failed: ['失败', 'gray'] };
+  var GOAL_LABEL = { alert_report: '异常汇总报告', usage_report: '用量周报' };
   function badge(map, key) {
     var e = map[key] || [key, 'gray'];
     return '<span class="badge ' + e[1] + '">' + escapeHtml(e[0]) + '</span>';
@@ -376,7 +466,7 @@
     var start = document.getElementById('rep-start').value;
     var end = document.getElementById('rep-end').value;
     if (!deviceId || !start) { toast('请填写设备ID与周期起始日期', false); return; }
-    var body = { deviceId: deviceId, periodType: document.getElementById('rep-type').value, start: start, end: end || null };
+    var body = { device_id: deviceId, period_type: document.getElementById('rep-type').value, start: start, end: end || null };
     api('/api/reports/generate', 'POST', body)
       .then(function () { toast('报表已生成', true); loadReports(); })
       .catch(function (e) { toast('生成失败：' + e.message, false); });
@@ -393,16 +483,16 @@
       .then(function (list) {
         var rows = (list || []).map(function (r) {
           return '<tr>'
-            + '<td class="mono">' + escapeHtml(r.deviceId) + '</td>'
-            + '<td>' + (r.periodType === 'monthly' ? '月报' : '周报') + '</td>'
-            + '<td>' + escapeHtml(r.periodStart) + '</td>'
-            + '<td>' + escapeHtml(r.periodEnd) + '</td>'
-            + '<td>' + r.turnCount + '</td>'
-            + '<td>' + r.sessionCount + '</td>'
-            + '<td>' + r.qaHitCount + '</td>'
-            + '<td>' + r.activeDays + '</td>'
+            + '<td class="mono">' + escapeHtml(r.device_id) + '</td>'
+            + '<td>' + (r.period_type === 'monthly' ? '月报' : '周报') + '</td>'
+            + '<td>' + escapeHtml(r.period_start) + '</td>'
+            + '<td>' + escapeHtml(r.period_end) + '</td>'
+            + '<td>' + r.turn_count + '</td>'
+            + '<td>' + r.session_count + '</td>'
+            + '<td>' + r.qa_hit_count + '</td>'
+            + '<td>' + r.active_days + '</td>'
             + '<td class="mono" title="' + escapeHtml(r.metrics) + '">' + escapeHtml(shortJson(r.metrics)) + '</td>'
-            + '<td>' + fmtTime(r.generatedAt) + '</td>'
+            + '<td>' + fmtTime(r.generated_at) + '</td>'
             + '</tr>';
         }).join('');
         setTbody('report-tbody', rows, 'report-empty', (list || []).length);
@@ -426,13 +516,13 @@
     var body = {
       title: document.getElementById('ntf-title').value.trim() || null,
       content: content,
-      sourceLanguage: srcLang,
-      targetType: document.getElementById('ntf-target-type').value,
-      targetId: targetId,
-      triggerType: triggerType,
-      scheduleAt: triggerType === 'once' && document.getElementById('ntf-schedule-at').value
+      source_language: srcLang,
+      target_type: document.getElementById('ntf-target-type').value,
+      target_id: targetId,
+      trigger_type: triggerType,
+      schedule_at: triggerType === 'once' && document.getElementById('ntf-schedule-at').value
         ? new Date(document.getElementById('ntf-schedule-at').value).toISOString() : null,
-      cronExpr: triggerType === 'cron' ? (document.getElementById('ntf-cron').value.trim() || null) : null
+      cron_expr: triggerType === 'cron' ? (document.getElementById('ntf-cron').value.trim() || null) : null
     };
     api('/api/notifications', 'POST', body)
       .then(function () { toast('通知已创建', true); loadNotifications(); })
@@ -443,19 +533,19 @@
     api('/api/notifications')
       .then(function (list) {
         var rows = (list || []).map(function (n) {
-          var target = (n.targetType === 'group' ? '群组:' : '设备:') + escapeHtml(n.targetId);
-          var trigger = n.triggerType === 'cron' ? '周期 ' + escapeHtml(n.cronExpr || '') : '单次 ' + fmtTime(n.scheduleAt);
+          var target = (n.target_type === 'group' ? '群组:' : '设备:') + escapeHtml(n.target_id);
+          var trigger = n.trigger_type === 'cron' ? '周期 ' + escapeHtml(n.cron_expr || '') : '单次 ' + fmtTime(n.schedule_at);
           var actions = '<button class="small secondary" onclick="showDeliveries(' + n.id + ')">投递</button> ';
           if (n.status === 'scheduled') actions += '<button class="small danger" onclick="cancelNotification(' + n.id + ')">取消</button>';
           return '<tr>'
             + '<td>' + escapeHtml(n.title || '—') + '</td>'
             + '<td>' + escapeHtml(shortJson(n.content)) + '</td>'
-            + '<td>' + escapeHtml(n.sourceLanguage) + '</td>'
+            + '<td>' + escapeHtml(n.source_language) + '</td>'
             + '<td>' + target + '</td>'
             + '<td>' + trigger + '</td>'
-            + '<td>' + fmtTime(n.scheduleAt) + '</td>'
+            + '<td>' + fmtTime(n.schedule_at) + '</td>'
             + '<td>' + badge(NTF_STATUS, n.status) + '</td>'
-            + '<td>' + fmtTime(n.createdAt) + '</td>'
+            + '<td>' + fmtTime(n.created_at) + '</td>'
             + '<td><div class="row-actions">' + actions + '</div></td>'
             + '</tr>';
         }).join('');
@@ -476,10 +566,10 @@
         var rows = (list && list.length)
           ? '<table><thead><tr><th>设备ID</th><th>译文</th><th>目标语言</th><th>投递时间</th></tr></thead><tbody>'
             + list.map(function (d) {
-                return '<tr><td class="mono">' + escapeHtml(d.deviceId) + '</td>'
-                  + '<td>' + escapeHtml(d.translatedText) + '</td>'
-                  + '<td>' + escapeHtml(d.targetLanguage) + '</td>'
-                  + '<td>' + fmtTime(d.deliveredAt) + '</td></tr>';
+                return '<tr><td class="mono">' + escapeHtml(d.device_id) + '</td>'
+                  + '<td>' + escapeHtml(d.translated_text) + '</td>'
+                  + '<td>' + escapeHtml(d.target_language) + '</td>'
+                  + '<td>' + fmtTime(d.delivered_at) + '</td></tr>';
               }).join('')
             + '</tbody></table>'
           : '<div class="empty">暂无投递回执</div>';
@@ -494,8 +584,8 @@
     var title = document.getElementById('ord-title').value.trim();
     if (!no || !title) { toast('请填写维修单号与标题', false); return; }
     var body = {
-      orderNo: no, title: title,
-      deviceId: document.getElementById('ord-device').value.trim() || null,
+      order_no: no, title: title,
+      device_id: document.getElementById('ord-device').value.trim() || null,
       description: document.getElementById('ord-desc').value.trim() || null,
       reporter: document.getElementById('ord-reporter').value.trim() || null
     };
@@ -521,13 +611,13 @@
             actions = '<span class="badge gray">终态</span>';
           }
           return '<tr>'
-            + '<td class="mono">' + escapeHtml(o.orderNo) + '</td>'
-            + '<td class="mono">' + escapeHtml(o.deviceId || '—') + '</td>'
+            + '<td class="mono">' + escapeHtml(o.order_no) + '</td>'
+            + '<td class="mono">' + escapeHtml(o.device_id || '—') + '</td>'
             + '<td>' + escapeHtml(o.title) + '</td>'
             + '<td>' + escapeHtml(shortJson(o.description)) + '</td>'
             + '<td>' + badge(ORDER_STATUS, o.status) + '</td>'
             + '<td>' + escapeHtml(o.reporter || '—') + '</td>'
-            + '<td>' + fmtTime(o.createdAt) + '</td>'
+            + '<td>' + fmtTime(o.created_at) + '</td>'
             + '<td><div class="row-actions">' + actions + '</div></td>'
             + '</tr>';
         }).join('');
@@ -549,9 +639,9 @@
     var checklist = document.getElementById('ins-checklist').value.trim();
     if (!no || !title || !checklist) { toast('请填写任务号、标题与点检清单', false); return; }
     var body = {
-      taskNo: no, title: title, checklist: checklist,
-      deviceId: document.getElementById('ins-device').value.trim() || null,
-      scheduledDate: document.getElementById('ins-date').value || null,
+      task_no: no, title: title, checklist: checklist,
+      device_id: document.getElementById('ins-device').value.trim() || null,
+      scheduled_date: document.getElementById('ins-date').value || null,
       assignee: document.getElementById('ins-assignee').value.trim() || null
     };
     api('/api/inspection/tasks', 'POST', body)
@@ -573,12 +663,12 @@
             actions += '<button class="small secondary" onclick="closeTask(' + t.id + ')">关闭</button>';
           }
           return '<tr>'
-            + '<td class="mono">' + escapeHtml(t.taskNo) + '</td>'
-            + '<td class="mono">' + escapeHtml(t.deviceId || '—') + '</td>'
+            + '<td class="mono">' + escapeHtml(t.task_no) + '</td>'
+            + '<td class="mono">' + escapeHtml(t.device_id || '—') + '</td>'
             + '<td>' + escapeHtml(t.title) + '</td>'
             + '<td class="mono" title="' + escapeHtml(t.checklist) + '">' + escapeHtml(shortJson(t.checklist)) + '</td>'
             + '<td>' + badge(TASK_STATUS, t.status) + '</td>'
-            + '<td>' + escapeHtml(t.scheduledDate || '—') + '</td>'
+            + '<td>' + escapeHtml(t.scheduled_date || '—') + '</td>'
             + '<td>' + escapeHtml(t.assignee || '—') + '</td>'
             + '<td><div class="row-actions">' + actions + '</div></td>'
             + '</tr>';
@@ -600,11 +690,11 @@
         var rows = (list && list.length)
           ? '<table><thead><tr><th>设备ID</th><th>结果</th><th>状态</th><th>点检人</th><th>点检时间</th><th>备注</th></tr></thead><tbody>'
             + list.map(function (r) {
-                return '<tr><td class="mono">' + escapeHtml(r.deviceId) + '</td>'
+                return '<tr><td class="mono">' + escapeHtml(r.device_id) + '</td>'
                   + '<td class="mono">' + escapeHtml(r.results) + '</td>'
                   + '<td>' + escapeHtml(r.status) + '</td>'
-                  + '<td>' + escapeHtml(r.inspectedBy) + '</td>'
-                  + '<td>' + fmtTime(r.inspectedAt) + '</td>'
+                  + '<td>' + escapeHtml(r.inspected_by) + '</td>'
+                  + '<td>' + fmtTime(r.inspected_at) + '</td>'
                   + '<td>' + escapeHtml(r.note || '—') + '</td></tr>';
               }).join('')
             + '</tbody></table>'
@@ -628,14 +718,149 @@
 
   function submitRecord(id) {
     var body = {
-      deviceId: document.getElementById('rec-device').value.trim() || null,
+      device_id: document.getElementById('rec-device').value.trim() || null,
       results: document.getElementById('rec-results').value.trim(),
-      inspectedBy: document.getElementById('rec-by').value.trim() || null,
+      inspected_by: document.getElementById('rec-by').value.trim() || null,
       note: document.getElementById('rec-note').value.trim() || null
     };
     api('/api/inspection/tasks/' + id + '/records', 'POST', body)
       .then(function () { closeModal(); toast('点检记录已提交', true); loadTasks(); })
       .catch(function (e) { toast('提交失败：' + e.message, false); });
+  }
+
+  // ==================== 知识缺口（① 自生长知识） ====================
+  function captureGaps() {
+    api('/api/knowledge-gaps/capture', 'POST')
+      .then(function (n) { toast('捕获完成：' + n + ' 条缺口', true); loadGaps(); })
+      .catch(function (e) { toast('捕获失败：' + e.message, false); });
+  }
+  function loadGaps() {
+    api('/api/knowledge-gaps')
+      .then(function (list) {
+        var rows = (list || []).map(function (g) {
+          var draft = g.draft_answer
+            ? '<div style="max-width:420px;">' + escapeHtml(g.draft_answer) + '</div>'
+            : '<span style="color:#8A8377;">—</span>';
+          var ops = '<button class="secondary" onclick="draftGap(' + g.id + ')">起草</button> '
+            + '<button class="primary" onclick="approveGap(' + g.id + ')">通过入库</button> '
+            + '<button class="secondary" onclick="rejectGap(' + g.id + ')">驳回</button>';
+          return '<tr><td>' + escapeHtml(g.question) + '</td>'
+            + '<td>' + g.occurrences + '</td>'
+            + '<td>' + badge(GAP_STATUS, g.status) + '</td>'
+            + '<td>' + draft + '</td><td>' + ops + '</td></tr>';
+        }).join('');
+        setTbody('gap-tbody', rows, 'gap-empty', (list || []).length);
+      })
+      .catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+  function draftGap(id) {
+    api('/api/knowledge-gaps/' + id + '/draft', 'POST')
+      .then(function () { toast('已起草候选（仅供参考，请审核）', true); loadGaps(); })
+      .catch(function (e) { toast('起草失败：' + e.message, false); });
+  }
+  function approveGap(id) {
+    if (!confirm('确认将该候选入库？（将写入知识库并发布）')) return;
+    api('/api/knowledge-gaps/' + id + '/approve', 'POST', {})
+      .then(function () { toast('已入库', true); loadGaps(); })
+      .catch(function (e) { toast('入库失败：' + e.message, false); });
+  }
+  function rejectGap(id) {
+    api('/api/knowledge-gaps/' + id + '/reject', 'POST')
+      .then(function () { toast('已驳回', true); loadGaps(); })
+      .catch(function (e) { toast('驳回失败：' + e.message, false); });
+  }
+
+  // ==================== 社内文书 / 报表导出（③ 文档处理） ====================
+  function downloadBlob(blob, filename) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(a.href);
+  }
+  function exportReportXlsx() {
+    var type = document.getElementById('rep-q-type').value;
+    var start = document.getElementById('rep-q-start').value;
+    var end = document.getElementById('rep-q-end').value;
+    if (!start) { toast('请填写起始日期', false); return; }
+    var url = '/api/reports/export.xlsx?periodType=' + encodeURIComponent(type) + '&start=' + start
+      + (end ? '&end=' + end : '');
+    fetch(url, { headers: { 'X-Customer-Id': customerId, 'X-Store-Id': storeId } })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.blob();
+      })
+      .then(function (blob) { downloadBlob(blob, 'report-' + type + '-' + start + '.xlsx'); toast('已导出', true); })
+      .catch(function (e) { toast('导出失败：' + e.message, false); });
+  }
+  function generateBusinessDoc() {
+    var topic = document.getElementById('doc-topic').value.trim();
+    if (!topic) { toast('请填写主题', false); return; }
+    var body = {
+      doc_type: document.getElementById('doc-type').value,
+      topic: topic,
+      points: document.getElementById('doc-points').value.trim()
+    };
+    fetch('/api/docgen/business-doc.docx', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Customer-Id': customerId, 'X-Store-Id': storeId },
+      body: JSON.stringify(body)
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.blob();
+      })
+      .then(function (blob) { downloadBlob(blob, 'business-doc.docx'); toast('已生成草稿（要確認）', true); })
+      .catch(function (e) { toast('生成失败：' + e.message, false); });
+  }
+
+  // ==================== 任务执行（② agent） ====================
+  function runAgentTask() {
+    var body = { goal: document.getElementById('ag-goal').value, mode: document.getElementById('ag-mode').value };
+    api('/api/agent/tasks', 'POST', body)
+      .then(function () { toast('任务已提交', true); loadAgentTasks(); })
+      .catch(function (e) { toast('提交失败：' + e.message, false); });
+  }
+  function loadAgentTasks() {
+    api('/api/agent/tasks')
+      .then(function (list) {
+        var anyRunning = false;
+        var rows = (list || []).map(function (t) {
+          if (t.status === 'running') anyRunning = true;
+          var steps = (t.steps || []).map(function (s) {
+            return '<div class="mono" style="font-size:12px;">' + escapeHtml(s.tool) + ' → '
+              + escapeHtml(s.status) + ' (' + s.ms + 'ms, 试图 ' + s.attempts + ')</div>';
+          }).join('');
+          var ops = (t.has_artifact
+              ? '<button class="small primary" onclick="downloadAgentArtifact(' + t.id + ')">下载</button> '
+              : '')
+            + '<button class="small secondary" onclick="showAgentDetail(' + t.id + ')">详情</button>';
+          return '<tr><td>' + t.id + '</td>'
+            + '<td>' + escapeHtml(GOAL_LABEL[t.goal] || t.goal) + '</td>'
+            + '<td>' + escapeHtml(t.mode) + '</td>'
+            + '<td>' + badge(AGENT_STATUS, t.status) + '</td>'
+            + '<td>' + (steps || '—') + '</td>'
+            + '<td>' + ops + '</td></tr>';
+        }).join('');
+        setTbody('ag-tbody', rows, 'ag-empty', (list || []).length);
+        if (anyRunning) { setTimeout(loadAgentTasks, 1500); } // 有执行中任务 → 轮询刷新
+      })
+      .catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+  function downloadAgentArtifact(id) {
+    fetch('/api/agent/tasks/' + id + '/artifact', { headers: { 'X-Customer-Id': customerId, 'X-Store-Id': storeId } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+      .then(function (blob) { downloadBlob(blob, 'agent-task-' + id); toast('已下载', true); })
+      .catch(function (e) { toast('下载失败：' + e.message, false); });
+  }
+  function showAgentDetail(id) {
+    api('/api/agent/tasks/' + id).then(function (t) {
+      var head = t.error ? '<div style="color:#c62828;margin-bottom:8px;">' + escapeHtml(t.error) + '</div>' : '';
+      var body = '<pre style="white-space:pre-wrap;font-size:12px;">' + escapeHtml(JSON.stringify(t.steps, null, 2)) + '</pre>';
+      openModal('<h3>任务 #' + t.id + '</h3>' + head + body);
+    }).catch(function (e) { toast('加载失败：' + e.message, false); });
   }
 
   // ---------- modal ----------
