@@ -1,10 +1,16 @@
 # AI 工牌 1.0 · 云端后端（aicard）项目说明
 
 # 梳理时间：2026/09/09
+> 更新 2026-10-16：按「两条腿」产品定位调整 §1，并新增「能力路线图（腿 B）」。
 
 ## 1. 项目简介
 
-**aicard** 是「AI 工牌 1.0」的云端后端（Middleware），面向日本市场服务业的可佩戴式 AI 语音翻译终端（胸牌/工牌形态）提供云端能力。终端只做音频采集/播放/按键/彩屏，语言判定（LID）、ASR/MT/TTS、供应商路由、知识库问答、设备管理等全部在云端完成。
+**aicard** 是「AI 工牌 1.0」的云端后端（Middleware）——**一套云端 AI 能力，服务两条产品线（「两条腿」）**：
+
+- **腿 A · 工牌线（重）**：面向日本服务业一线的可佩戴式 AI 语音终端（胸牌/工牌形态）。**终端只做**音频采集/播放/按键/彩屏；语言判定（LID）、ASR/MT/TTS、供应商路由、知识库问答、设备管理等**全部在云端**。
+- **腿 B · 后台 AI 线（轻）**：**纯软件、零硬件**，面向日本中小企业的事务/总务职能，做知识沉淀 / 文书处理 / 多步任务执行。**规划中**（见下方「能力路线图」）。
+
+两条腿**共用同一套云端核心**（知识库 + 广播 + 报表 + 工单 + 通知 + 设备管理），互为前后端——工牌是其中一个前端，后台是另一个。产品定位与决策见 `docs/baseline/2026-10-16-团队对齐-日本中小企业市场与两条腿业务模式.md`。
 
 > 权威需求来源：《AI工牌1.0产品需求文档（0804）》。架构 spec 见 `docs/superpowers/specs/2026-08-21-ai-card-software-architecture-design.md`。
 
@@ -20,6 +26,18 @@
 | **旁路采集** | 翻译结果脱敏异步落库（translation_sample），形成数据飞轮 |
 | **运营后台** | 设备管理、知识库文档导入/发布 REST + RBAC 骨架 |
 
+### 能力路线图（腿 B · 后台 AI 线）
+
+在现有云端核心之上，按「零件齐备度」递增三条能力（详见 `docs/baseline/2026-10-16-团队对齐-日本中小企业市场与两条腿业务模式.md`）：
+
+| 优先级 | 能力 | 现状 | 落点 |
+|--------|------|------|------|
+| ① | **自生长知识** | 原料已在库（`qa_log` 已记 `no_match`、`translation_sample` 旁路采集），缺闭环 | 复用 `skb/`、`ingestion/`；新增 `skb/curation/`（缺口聚合 + 候选起草）+ 后台审核页 |
+| ③ | **文档/文书处理** | 周报/月报（`report/`）已是数据聚合，缺输出端 | `report/` 输出端升级为文件生成（xlsx/docx） |
+| ② | **agent 执行** | 现为「问→答」，无多步编排 | 新增 `agent/`（任务状态机 + 工具注册表），把 `report`/`maintenance`/`notification`/`broadcast`/`skb` 注册为工具 |
+
+> 三者共同内核：**记忆（①积累）→ 产出（③交付）→ 编排（②干活）**，即从「通道」变「agent」。
+
 ---
 
 ## 2. 技术栈
@@ -31,7 +49,7 @@
 | **Web** | spring-boot-starter-web / websocket | 8080 端口，WSS 设备接入 + REST 后台 |
 | **持久层** | Spring Data JPA + JdbcTemplate | JPA 管租户实体，知识库走 JdbcTemplate |
 | **数据库** | PostgreSQL + pgvector | pg16，向量扩展存 embedding |
-| **迁移** | Flyway | V1–V6 |
+| **迁移** | Flyway | V1–V17 |
 | **语音供应商** | Azure AI Speech | client-sdk 1.51.2，region japaneast（LID/ASR/MT/TTS 一步） |
 | **Embedding** | Azure OpenAI text-embedding-3-small | REST 调用，1536 维 |
 | **LLM** | aibridgex（OpenAI 兼容网关）deepseek-v4-flash | REST 调用，受限生成 + 翻译 |
@@ -89,7 +107,7 @@ aicard/
 ├── src/main/resources/
 │   ├── application.yml                  # 主配置（数据库/Azure/aibridgex/质量门控）
 │   ├── static/index.html                # 测试页（SKB/VKB 切换）
-│   └── db/migration/                    # Flyway V1__init ~ V6__document_domain
+│   └── db/migration/                    # Flyway V1__init ~ V17__operation_notification
 ├── src/test/java/com/aicard/            # 单元/集成测试（与 main 镜像结构）
 ├── docs/                                # 需求/知识库/接口规范/联调文档
 ├── deploy-docs/                         # 运维部署说明
@@ -225,12 +243,13 @@ customer（客户/租户）
 
 ```
 docs/
-├── 演示知识库-便利店与免税店-日语版.md     # SKB 内容（19 主题，308 条问答）
-├── 演示知识库-连锁酒店-日语版.md            # SKB 内容
-├── VKB游客FAQ-日语版.md                    # VKB 内容（20 document，38 条）
-├── 知识库验收评估-*-日语版.md              # 内容验收评估报告
-├── 知识库检索测试指南-日语.md               # 检索测试指南
-└── 品牌词表-初稿.md                        # 质量门控品牌词表
+├── README.md            # 文档索引（入口）
+├── baseline/            # ★ 核心基线：产品需求 / 两条腿技术需求 / 数据库说明 / 开发指南 / 团队对齐
+├── knowledge-base/      # 知识库内容：演示知识库(SKB) / 游客·劳工 FAQ(VKB) / 验收评估 / 检索测试指南 / 架构对比
+├── exports/             # 非 md 生成物（docx / html / pdf）
+├── archive/             # 历史会议 / 周报 / 评审
+├── requirements/        # PRD 提取文本（PRD-0804.txt 等）
+└── 品牌词表-初稿.md      # 质量门控品牌词表（顶层另有接口规范等参考文档）
 ```
 
 ### 6.2 知识文件格式
@@ -396,7 +415,7 @@ docker run -d --name aicard-app --restart always \
 | `chunk` | 文档切片（text + embedding vector(1536)） |
 | `translation_sample` | 旁路采集翻译样本（脱敏，数据飞轮） |
 
-- 迁移由 Flyway 管理（V1–V6），`ddl-auto=validate`。
+- 迁移由 Flyway 管理（V1–V17），`ddl-auto=validate`。
 - 关键索引：device/store/document/chunk 均有 customer_id+store_id 复合索引，document 有 domain 索引。
 
 ---

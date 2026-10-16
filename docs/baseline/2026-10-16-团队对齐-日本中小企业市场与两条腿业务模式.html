@@ -1,0 +1,397 @@
+<title>日本 SME 与两条腿业务模式</title>
+<style>
+  :root {
+    --bg: #F4F6F7;
+    --surface: #FFFFFF;
+    --surface-2: #EDF1F3;
+    --ink: #1B2129;
+    --ink-soft: #3C4652;
+    --muted: #56646F;
+    --line: #DCE2E6;
+    --line-strong: #C3CCD2;
+    --accent: #B5402A;
+    --accent-ink: #8E3020;
+    --primary: #22405F;
+    --primary-soft: #E7EDF2;
+    --ok: #2F6B54;
+    --ok-bg: #E4EFE9;
+    --warn: #7E5610;
+    --warn-bg: #F5EBD7;
+    --font-display: "Songti SC", "STSong", "Hiragino Mincho ProN", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+    --font-body: "PingFang SC", "Hiragino Sans", "Noto Sans CJK SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --measure: 74ch;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #11161B;
+      --surface: #19212A;
+      --surface-2: #212A33;
+      --ink: #E8ECEF;
+      --ink-soft: #C4CDD5;
+      --muted: #93A0AB;
+      --line: #2B353E;
+      --line-strong: #3B4854;
+      --accent: #E0705A;
+      --accent-ink: #F1A695;
+      --primary: #93B8DA;
+      --primary-soft: #1D2935;
+      --ok: #82C2A3;
+      --ok-bg: #1B2A23;
+      --warn: #DBB56A;
+      --warn-bg: #2A2418;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #11161B;
+    --surface: #19212A;
+    --surface-2: #212A33;
+    --ink: #E8ECEF;
+    --ink-soft: #C4CDD5;
+    --muted: #93A0AB;
+    --line: #2B353E;
+    --line-strong: #3B4854;
+    --accent: #E0705A;
+    --accent-ink: #F1A695;
+    --primary: #93B8DA;
+    --primary-soft: #1D2935;
+    --ok: #82C2A3;
+    --ok-bg: #1B2A23;
+    --warn: #DBB56A;
+    --warn-bg: #2A2418;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.75;
+    font-feature-settings: "palt" 1;
+  }
+
+  .doc {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: clamp(28px, 5vw, 72px) clamp(20px, 5vw, 56px) 96px;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  /* ---- header ---- */
+  .masthead { display: flex; flex-direction: column; gap: 14px; padding-bottom: 28px; border-bottom: 2px solid var(--primary); }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600;
+  }
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: clamp(28px, 4.6vw, 42px);
+    line-height: 1.25; margin: 0; letter-spacing: .01em;
+    text-wrap: balance; color: var(--ink);
+  }
+  .meta { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); letter-spacing: .02em; }
+  .meta b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ---- sections ---- */
+  section { display: flex; flex-direction: column; gap: 18px; }
+  h2 {
+    font-family: var(--font-display);
+    font-size: clamp(20px, 2.6vw, 25px);
+    font-weight: 700; margin: 0; letter-spacing: .01em;
+    padding-left: 14px; border-left: 4px solid var(--accent);
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: 16.5px; font-weight: 700; margin: 6px 0 0;
+    color: var(--primary); letter-spacing: .01em;
+  }
+  p { margin: 0; max-width: var(--measure); color: var(--ink-soft); }
+  strong { color: var(--ink); font-weight: 700; }
+  em { font-style: normal; color: var(--accent-ink); font-weight: 600; }
+
+  /* ---- TL;DR card ---- */
+  .tldr { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 26px 28px; display: flex; flex-direction: column; gap: 14px; }
+  .tldr .label { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  .tldr ol { margin: 0; padding-left: 0; list-style: none; counter-reset: t; display: flex; flex-direction: column; gap: 11px; }
+  .tldr li { counter-increment: t; position: relative; padding-left: 40px; color: var(--ink-soft); line-height: 1.7; }
+  .tldr li::before {
+    content: counter(t, decimal-leading-zero);
+    position: absolute; left: 0; top: .18em;
+    font-family: var(--font-mono); font-size: 12.5px; font-weight: 700;
+    color: var(--primary);
+    background: var(--primary-soft); border-radius: 4px;
+    padding: 2px 7px; line-height: 1.4;
+  }
+
+  /* ---- tables ---- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 15px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--muted); background: var(--surface-2); font-weight: 600; white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td strong { color: var(--ink); }
+  .num { font-variant-numeric: tabular-nums; font-family: var(--font-mono); }
+
+  /* ---- chips ---- */
+  .chip {
+    display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+    letter-spacing: .06em; padding: 2px 8px; border-radius: 999px; white-space: nowrap;
+  }
+  .chip.ok { color: var(--ok); background: var(--ok-bg); }
+  .chip.warn { color: var(--warn); background: var(--warn-bg); }
+
+  /* ---- legs diagram ---- */
+  .legs { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 620px) { .legs { grid-template-columns: 1fr; } }
+  .leg { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--primary); border-radius: 6px; padding: 20px 22px; display: flex; flex-direction: column; gap: 10px; }
+  .leg.b { border-top-color: var(--accent); }
+  .leg .tag { font-family: var(--font-mono); font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .leg h4 { font-family: var(--font-display); font-size: 19px; margin: 0; font-weight: 700; }
+  .leg ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 5px; color: var(--ink-soft); font-size: 14.5px; }
+  .leg .who { font-size: 13.5px; color: var(--muted); }
+
+  /* ---- callout ---- */
+  .callout {
+    background: var(--primary-soft); border-left: 4px solid var(--primary);
+    border-radius: 0 6px 6px 0; padding: 16px 20px; color: var(--ink-soft); font-size: 15px;
+  }
+  .callout.accent { background: var(--warn-bg); border-left-color: var(--accent); }
+  .callout b { color: var(--ink); }
+
+  /* ---- glossary ---- */
+  .gloss { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px 22px; }
+  .gloss div { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px dashed var(--line); font-size: 14px; }
+  .gloss .jp { font-family: var(--font-mono); font-size: 12.5px; color: var(--muted); }
+
+  footer { border-top: 1px solid var(--line); padding-top: 20px; font-size: 13px; color: var(--muted); font-family: var(--font-mono); letter-spacing: .02em; }
+
+  ul.plain { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 7px; max-width: var(--measure); color: var(--ink-soft); }
+  a { color: var(--accent-ink); }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<main class="doc">
+  <header class="masthead">
+    <span class="eyebrow">AI 工牌 · 团队对齐</span>
+    <h1>日本中小企业市场 与「两条腿」业务模式</h1>
+    <p class="meta"><b>日期</b> 2026-10-16 &nbsp;·&nbsp; <b>用途</b> 团队内部统一认识，供讨论 &nbsp;·&nbsp; <b>性质</b> 方向共识 + 决策记录，非最终商业计划</p>
+  </header>
+
+  <section class="tldr">
+    <span class="label">一页结论</span>
+    <ol>
+      <li>把 AI 工牌从「一台设备」升级为「<strong>一套云端 AI 能力</strong>」——用<strong>两条腿</strong>打日本市场。</li>
+      <li><strong>腿 A · 工牌线</strong>（重）：现场多语言，面向<strong>高外劳</strong>的门店 / 连锁 / 派遣公司。</li>
+      <li><strong>腿 B · 后台 AI 线</strong>（轻）：<strong>纯软件、零硬件</strong>，做知识 / 文书 / 事务，面向<strong>绝大多数中小企业</strong>。</li>
+      <li>重点市场 = <strong>日本中小企业（SME）</strong>；但「SME」太宽——<strong>靶心收窄到「中小企業 标准档」</strong>（有事务职能、有预算、有审批），<strong>不碰极小规模</strong>。</li>
+      <li><strong>先能力、后入场费</strong>：先做产品能力（① 自生长知识 → ③ 文档处理 → ② agent 执行），暂不投属地化运营。</li>
+      <li>一个必须统一的认识：打 SME 的主力是<strong>腿 B（软件）</strong>，不是工牌；<strong>工牌是护城河，软件是入口</strong>。</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>1 · 为什么聚焦日本中小企业</h2>
+    <h3>机会：数据摆在这里</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>指标</th><th>数值</th><th>解读</th></tr></thead>
+        <tbody>
+          <tr><td>中小企业占企业数</td><td class="num"><strong>约 99.7%</strong>（就业约 7 成）</td><td>谈「日本市场」几乎等于谈 SME</td></tr>
+          <tr><td>企业生成 AI 利用率（日本）</td><td class="num"><strong>55.2%</strong>，美 90.6% / 中 95.8%</td><td>国际垫底</td></tr>
+          <tr><td>AI agent「利用中」的企业</td><td class="num"><strong>仅 3.3%</strong>（"信息收集中" 49.3%）</td><td>agent 几乎<strong>空白</strong></td></tr>
+          <tr><td>采用障碍</td><td>不会用 30.1% / 安全 27.6% / 缺人才 41.3%</td><td>门槛是「不会用」，不是「不需要」</td></tr>
+          <tr><td>生成 AI 方针「未定」</td><td class="num"><strong>50.9%</strong></td><td>治理空白</td></tr>
+          <tr><td>活用企业体感有效</td><td class="num"><strong>86.7%</strong></td><td>价值真实，缺的是「怎么用」</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>口径提醒：55.2% 是广义口径，且<strong>大企业远高于中小企业</strong>，不能当成 SME 数字——SME 实际更低。</p>
+
+    <h3>SME 的四个结构性痛点（= 落地的土壤）</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>痛点</th><th>内容</th><th>对 AI 的意义</th></tr></thead>
+        <tbody>
+          <tr><td><strong>① 人手不足</strong></td><td>少子高龄化；2024 年起工时上限规制适用中小企业</td><td><strong>最硬的买单理由</strong></td></tr>
+          <tr><td><strong>② 事業承継危机</strong></td><td>约 245 万家经营者 70 岁+、约一半无后继</td><td>属人化 / 知识流失——正是「沉淀」卖点</td></tr>
+          <tr><td><strong>③ IT 人材不足</strong></td><td>无 IT 部门是常态，総務 / 経理兼管 IT</td><td>产品必须<strong>零运维、零培训</strong></td></tr>
+          <tr><td><strong>④ 稟議 + 补助金依赖</strong></td><td>决策靠稟議，AI 预算高度靠补助金</td><td>需要稟議材料 + 补助金通道</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout"><b>一句话：</b>机会真实（市场最大、痛点最硬、AI 几乎空白），<b>但闸门在产品之外</b>（见 §6）。</div>
+  </section>
+
+  <section>
+    <h2>2 · 厘清：SME 不是一个市场</h2>
+    <p>法律上按「资本金 或 员工数」定义：製造等 3 億円/300 人以下；卸売 1 億円/100 人以下；<strong>小売・サービス 5 千万円/50 人以下</strong>。「小規模事業者」是更小一档。但真正的分野不在大小，而在<strong>有没有事务职能</strong>：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>层</th><th>规模（示意）</th><th>特征</th><th>AI 适配</th></tr></thead>
+        <tbody>
+          <tr><td><strong>小規模事業者</strong></td><td class="num">〜5（商业/服务）/ 〜20</td><td>社長一人、无专职事务、无 IT</td><td>❌ 无预算、无职能</td></tr>
+          <tr><td><strong>中小企業（标准档）</strong></td><td class="num">〜50–300</td><td>有総務 / 経理职能、有稟議、有预算</td><td><span class="chip ok">靶心</span></td></tr>
+          <tr><td><strong>中堅企業</strong></td><td class="num">300+</td><td>系统化、有 IT</td><td>预算够但竞品密集、决策慢</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>结论：靶心 =「中小企業 标准档」。</strong>不碰极小规模——那档没有「总务/事务」职能，我们最看好的「自生长知识」在那里<em>根本没人审、没人用</em>。也暂不主攻中坚——竞争激烈（Copilot / LegalOn / LayerX / Stockmark）且决策慢。</p>
+  </section>
+
+  <section>
+    <h2>3 · 产品做成「两条腿」</h2>
+    <div class="legs">
+      <div class="leg">
+        <span class="tag">腿 A · 金标（重）</span>
+        <h4>工牌线</h4>
+        <p class="who">客户：高外劳的门店 / 连锁 / 派遣公司</p>
+        <ul>
+          <li>现场多语言、佩戴免培训</li>
+          <li>有硬件（ODM / 电池 / OTA）</li>
+          <li>交付摩擦高、毛利低、上市慢</li>
+        </ul>
+      </div>
+      <div class="leg b">
+        <span class="tag">腿 B · 轻（软件）</span>
+        <h4>后台 AI 线</h4>
+        <p class="who">客户：绝大多数中小企业（含无外劳者）</p>
+        <ul>
+          <li>知识 / 文书 / 事务，零硬件</li>
+          <li>纯 SaaS，浏览器 / App</li>
+          <li>交付摩擦低、毛利高、上市快</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout"><b>这不是「分心做第二个产品」</b>——是把<b>已经存在的云端核心</b>（知识库 + 广播 + 报表 + 工单 + 通知）显性化为可单独交付的价值。工牌是它的一个前端，后台是另一个。</div>
+  </section>
+
+  <section>
+    <h2>4 · 两条腿的业务模式</h2>
+    <h3>腿 A · 工牌线</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>项</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td><strong>客户</strong></td><td>高外劳的连锁 / 门店 / 派遣公司（製造 / 農業 / 介護 / 建設 / 清掃 / 飲食）</td></tr>
+          <tr><td><strong>卖什么</strong></td><td>工牌硬件 + 云端服务（翻译 / 知识 / 广播 / 回执）</td></tr>
+          <tr><td><strong>怎么收钱</strong></td><td>硬件一次性（或含在月租内）+ 云订阅（按设备 / 门店）</td></tr>
+          <tr><td><strong>交付</strong></td><td>ODM 硬件 + 云 SaaS（日本区）</td></tr>
+          <tr><td><strong>价值</strong></td><td>现场免培训多语言、安全合规下沉、一线数据回流</td></tr>
+          <tr><td><strong>局限</strong></td><td>硬件摩擦（采购 / 运维）、毛利低、上市慢</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>腿 B · 后台 AI 线</h3>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>项</th><th>内容</th></tr></thead>
+        <tbody>
+          <tr><td><strong>客户</strong></td><td>中小企业标准档的<strong>事务 / 总务职能</strong>（不限行业、不限外劳）</td></tr>
+          <tr><td><strong>卖什么</strong></td><td>纯软件：知识自动沉淀（①）、文书作成（③）、多步任务执行（②）</td></tr>
+          <tr><td><strong>怎么收钱</strong></td><td>SaaS 席位 / 月订阅（日本锚点：月额数千～1 万日元 / 席）</td></tr>
+          <tr><td><strong>交付</strong></td><td>浏览器 / App，零硬件、零运维</td></tr>
+          <tr><td><strong>价值</strong></td><td>无硬件门槛、毛利高、可快速起量；知识越用越强</td></tr>
+          <tr><td><strong>局限</strong></td><td>ARPU 低、易被<strong>免费 ChatGPT</strong>替代、需日语支持</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout accent"><b>两腿的关系：</b>腿 A 的一线交互 → 沉淀进云端知识 → 腿 B 更懂这家企业 → 反哺腿 A。<b>腿 B 是入口，腿 A 是护城河。</b></div>
+  </section>
+
+  <section>
+    <h2>5 · 已定决策（团队统一口径）</h2>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>#</th><th>决策</th><th>结论</th><th>理由</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>产品定位</td><td><strong>两条腿</strong>：工牌线 + 后台 AI 线</td><td>三条新能力全在后台、全无硬件，不必绑死一个形态</td></tr>
+          <tr><td class="num">2</td><td>目标市场</td><td><strong>做 SME</strong></td><td>市场最大、痛点最硬、AI 空白</td></tr>
+          <tr><td class="num">3</td><td>靶心</td><td><strong>中小企業 标准档</strong>，不碰极小规模</td><td>那档无事务职能，方向①③无人用</td></tr>
+          <tr><td class="num">4</td><td>细分口径</td><td><strong>「外劳占比 × 门店规模」</strong>二维</td><td>「日本服务业」太粗，会两腿错位</td></tr>
+          <tr><td class="num">5</td><td>能力优先级</td><td><strong>① 自生长知识 → ③ 文档处理 → ② agent 执行</strong></td><td>按「零件齐备度」排</td></tr>
+          <tr><td class="num">6</td><td>投入节奏</td><td><strong>先能力、后入场费</strong></td><td>见 §6</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>6 · 为什么「先能力、后入场费」</h2>
+    <p>打 SME 不能像卖大企业那样直接把产品递过去——中间要走几套<strong>日本特有的机制</strong>，这就是「入场费」（产品之外的基础设施）：</p>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>#</th><th>项</th><th>是什么</th><th>为什么 SME 非要</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td><strong>IT 导入补助金</strong></td><td>政府替 SME 出钱买 IT（补助率常约 1/2～3/4）</td><td>SME 的 AI 预算很大程度靠补助解锁</td></tr>
+          <tr><td class="num">2</td><td><strong>支援事业者 / 认定支援机构</strong></td><td>有资质的中间人（税理士 / 商工会議所 / 银行）</td><td>SME 信他们 >> 信厂商；既是补助通道也是推荐渠道</td></tr>
+          <tr><td class="num">3</td><td><strong>日语支持体系</strong></td><td>全程日语客服 / 文档 / 培训</td><td>SME 无 IT 部门，无日语客服 = 直接出局</td></tr>
+          <tr><td class="num">4</td><td><strong>稟議材料</strong></td><td>客户拿去走内部审批（ROI / 试点 / 步骤）</td><td>稟議要走 1–3 个月，没材料推不动</td></tr>
+          <tr><td class="num">5</td><td><strong>Pマーク / ISMS</strong></td><td>隐私 / 信息安全认证</td><td>采购 SaaS 走审批时常被要求（<strong>取证 6–12 月</strong>）</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul class="plain">
+      <li>这 5 项全是<strong>「重运营」投入</strong>，和「把产品能力做出来」是<strong>两条线</strong>。</li>
+      <li>当前阶段目的是<strong>演示 / 融资</strong>——先烧钱铺属地化运营不划算。</li>
+      <li><strong>能力本身就是腿 B 的 SME 入口</strong>：先跑出来既能验证市场、又不耽误。</li>
+      <li><strong>例外</strong>：若「对投资人讲 SME 故事」当下就很关键，<strong>Pマーク / ISMS 要提前启动</strong>（周期最长）。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>7 · 这对团队意味着什么</h2>
+    <h3>优先级（统一）</h3>
+    <p><strong>① 自生长知识 → ③ 文档处理 → ② agent 执行。</strong>共同内核：<strong>记忆（①积累）→ 产出（③交付）→ 编排（②干活）</strong>，即从「通道」变「agent」。</p>
+    <h3>细分口径（统一）</h3>
+    <p>对外<strong>不再笼统说「日本服务业」</strong>，改用「外劳占比 × 门店规模」：低外劳 × 小规模 → 腿 B；高外劳 × 中规模 → 腿 A 为主；<strong>不碰极小规模</strong>。</p>
+    <h3>不同场合讲不同话（统一）</h3>
+    <p><strong>对客户</strong>讲具体场景（「帮你答这个问题」「帮你写这份文书」），<strong>不讲「通用 agent 平台」</strong>；<strong>对投资人</strong>讲平台 / 数据闭环 / 两条腿。</p>
+    <h3>需要统一的四个口径</h3>
+    <ul class="plain">
+      <li><strong>一句话定位</strong>：从「佩戴式翻译终端」→「一线 agent 助手 + 后台 AI 助手」。</li>
+      <li><strong>为什么不用免费 ChatGPT</strong>：现场 / 免培训 / 多语言 / 佩戴式 + 企业知识隔离 + 数据不进训练 + 合规。</li>
+      <li><strong>合规表述</strong>：用「模型可替换 + 数据驻留分层」，<em>不要</em>讲「数据不出日本」。</li>
+      <li><strong>两条腿主次</strong>：腿 B 是 SME 入口，腿 A 是护城河——不互相取代。</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>8 · 待讨论</h2>
+    <ul class="plain">
+      <li>「两条腿」写入定位后，现有材料（投资人推介 / 客户推介 / 项目说明）如何改写？</li>
+      <li>腿 B 的目标用户（事务 / 总务）与原「一线」定位的命名与边界如何统一？</li>
+      <li>腿 B 的首发场景选哪个（对齐 ① 自生长知识）？</li>
+      <li>若融资需要，Pマーク / ISMS 是否提前启动？</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>附录 · 日语术语表</h2>
+    <div class="gloss">
+      <div><span>IT 导入补助金</span><span class="jp">IT導入補助金</span></div>
+      <div><span>支援事业者 / 认定支援机构</span><span class="jp">支援事業者 / 認定支援機関</span></div>
+      <div><span>登记 IT 工具</span><span class="jp">登録ITツール</span></div>
+      <div><span>稟議（书面请示审批）</span><span class="jp">稟議</span></div>
+      <div><span>隐私标章</span><span class="jp">Pマーク</span></div>
+      <div><span>信息安全管理体系</span><span class="jp">ISMS</span></div>
+      <div><span>事业传承 / 交班</span><span class="jp">事業承継</span></div>
+      <div><span>总务（行政 / 事务职能）</span><span class="jp">総務</span></div>
+      <div><span>当地商会</span><span class="jp">商工会議所</span></div>
+    </div>
+  </section>
+
+  <footer>
+    数据来源：WorkBuddy《日本市场调研》（2026-10-11，部分 ✅ 已核实一手源）；⚠️ 中小企业数量 / 事业承継测算 / 补助金各年度条款 待二次核实。 详细版见仓库 docs/ 三份 2026-10-16 文档。
+  </footer>
+</main>
