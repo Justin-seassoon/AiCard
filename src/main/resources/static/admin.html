@@ -317,6 +317,8 @@
         <div class="empty" id="gap-empty" style="display:none;">暂无缺口（先在测试页问一条知识库未覆盖的问题，再点“触发器捕获”）</div>
       </div>
     </div>
+  </section>
+
   <!-- ==================== 社内文书（③ 文档/文书处理） ==================== -->
   <section id="panel-docgen" class="panel">
     <div class="card">
@@ -341,6 +343,8 @@
         <button class="primary" onclick="generateBusinessDoc()">生成草稿（docx）</button>
       </div>
     </div>
+  </section>
+
   <!-- ==================== 任务执行（② agent） ==================== -->
   <section id="panel-agent" class="panel">
     <div class="card">
@@ -349,18 +353,21 @@
         agent 拆解任务、多步执行并交付文件——含<b>失败重试</b>与<b>确定性校验</b>（数字对账）。
       </p>
       <div class="form-grid">
-        <div class="field"><label>目标</label>
-          <select id="ag-goal">
-            <option value="alert_report">异常汇总报告（docx）</option>
-            <option value="usage_report">用量周报（xlsx）</option>
-          </select>
-        </div>
+        <div class="field full"><label>指令（自然语言） <span class="req">*</span></label>
+          <input id="ag-goal" placeholder="例：先週の修繕と点検をまとめて報告書にして"></div>
         <div class="field"><label>规划方式</label>
           <select id="ag-mode">
-            <option value="rule">规则工作流（稳定）</option>
-            <option value="llm">LLM 自主</option>
+            <option value="auto">自动（LLM 主 + 规则兜底）</option>
+            <option value="llm">纯 LLM</option>
+            <option value="rule">规则（两个固定模板）</option>
           </select>
         </div>
+      </div>
+      <div style="margin:10px 0 12px;font-size:12px;color:#6E685C;">示例（点击填充）：
+        <a href="#" onclick="fillGoal('先週の修繕と点検をまとめて報告書にして');return false;">异常汇总报告</a> ·
+        <a href="#" onclick="fillGoal('今週の利用状況をレポートにして');return false;">用量周报</a> ·
+        <a href="#" onclick="fillGoal('経費精算の締め日を調べて、社内通知の下書きを作って');return false;">查规程+写通知</a> ·
+        <a href="#" onclick="fillGoal('未回答の質問を一覧にして');return false;">知识缺口</a>
       </div>
       <div style="margin-top:12px;">
         <button class="primary" onclick="runAgentTask()">执行</button>
@@ -817,8 +824,11 @@
   }
 
   // ==================== 任务执行（② agent） ====================
+  function fillGoal(text) { document.getElementById('ag-goal').value = text; }
   function runAgentTask() {
-    var body = { goal: document.getElementById('ag-goal').value, mode: document.getElementById('ag-mode').value };
+    var goal = document.getElementById('ag-goal').value.trim();
+    if (!goal) { toast('请填写指令', false); return; }
+    var body = { goal: goal, mode: document.getElementById('ag-mode').value };
     api('/api/agent/tasks', 'POST', body)
       .then(function () { toast('任务已提交', true); loadAgentTasks(); })
       .catch(function (e) { toast('提交失败：' + e.message, false); });
@@ -838,7 +848,7 @@
               : '')
             + '<button class="small secondary" onclick="showAgentDetail(' + t.id + ')">详情</button>';
           return '<tr><td>' + t.id + '</td>'
-            + '<td>' + escapeHtml(GOAL_LABEL[t.goal] || t.goal) + '</td>'
+            + '<td>' + escapeHtml(shortJson(GOAL_LABEL[t.goal] || t.goal)) + '</td>'
             + '<td>' + escapeHtml(t.mode) + '</td>'
             + '<td>' + badge(AGENT_STATUS, t.status) + '</td>'
             + '<td>' + (steps || '—') + '</td>'
