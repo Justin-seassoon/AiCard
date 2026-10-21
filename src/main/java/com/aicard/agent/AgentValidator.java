@@ -49,6 +49,24 @@ public class AgentValidator {
         return null;
     }
 
+    /**
+     * 目标是否要求交付文件（用于消灭「假完成」：模型说完成但没产出文件）。
+     * 只按显式的文书/表格措辞判断，避免把普通问答误判为需要文件。
+     */
+    public static boolean expectsArtifact(String goal) {
+        if (goal == null) {
+            return false;
+        }
+        String[] markers = {"作って", "作成", "レポート", "報告書", "Excel", "エクセル",
+                "文書", "通知", "回覧", "下書き", "ドラフト"};
+        for (String marker : markers) {
+            if (goal.contains(marker)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Integer intFromTool(List<StepRecord> history, String tool, String field) {
         for (StepRecord s : history) {
             if (tool.equals(s.tool()) && StepRecord.OK.equals(s.status())) {

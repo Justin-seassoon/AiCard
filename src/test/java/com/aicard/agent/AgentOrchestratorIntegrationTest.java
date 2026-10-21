@@ -34,6 +34,7 @@ class AgentOrchestratorIntegrationTest {
     @Autowired AgentTaskRepository tasks;
     @Autowired AgentOrchestrator orchestrator;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.aicard.skb.provider.LLMProvider llmProvider;
 
     @Test
     void alertReportProducesDocx() {
@@ -60,6 +61,30 @@ class AgentOrchestratorIntegrationTest {
 
         assertThat(done.getStatus()).isEqualTo(AgentTask.STATUS_DONE);
         assertThat(done.getSteps()).contains("usage_summary").contains("generate_usage_xlsx");
+        assertThat(artifactBytes(done)).isNotEmpty();
+    }
+
+    /** ②-A：自由文本目标 → LLM（Mock）规划 → compose_docx 产物。 */
+    @Test
+    void freeTextGoalPlannedByLlmProducesDocx() {
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                llmProvider instanceof com.aicard.skb.provider.mock.MockLlmProvider, "需要 Mock LLM");
+        com.aicard.skb.provider.mock.MockLlmProvider mock =
+                (com.aicard.skb.provider.mock.MockLlmProvider) llmProvider;
+        mock.setPlans(java.util.List.of(
+                com.aicard.skb.provider.LLMProvider.PlanStep.tool("compose_docx",
+                        "{\"title\":\"社内通知\",\"lines\":[\"11月10日に全社会議を行います。\"]}"),
+                com.aicard.skb.provider.LLMProvider.PlanStep.finished()));
+
+        long c = 101L, s = 102L;
+        AgentTask task = tasks.save(AgentTask.builder()
+                .customerId(c).storeId(s).goal("社内通知の下書きを作って").mode(AgentTask.MODE_AUTO)
+                .status(AgentTask.STATUS_PENDING).createdAt(Instant.now()).updatedAt(Instant.now()).build());
+        orchestrator.run(task.getId());
+
+        AgentTask done = tasks.findById(task.getId()).orElseThrow();
+        assertThat(done.getStatus()).isEqualTo(AgentTask.STATUS_DONE);
+        assertThat(done.getArtifactName()).isEqualTo("composed-doc.docx");
         assertThat(artifactBytes(done)).isNotEmpty();
     }
 

@@ -26,8 +26,10 @@ public class ToolRegistry {
         return List.copyOf(byName.keySet());
     }
 
-    /** 供 LLM 规划的工具清单（名 + 描述）。 */
+    /** 供 LLM 规划的工具清单（名 + 描述 + 参数提示）。 */
     public List<String> specs() {
-        return byName.values().stream().map(t -> t.name() + "：" + t.description()).toList();
+        return byName.values().stream()
+                .map(t -> t.name() + "：" + t.description() + "（args: " + t.argsHint() + "）")
+                .toList();
     }
 }

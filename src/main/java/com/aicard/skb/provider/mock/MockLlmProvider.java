@@ -15,13 +15,23 @@ public class MockLlmProvider implements LLMProvider {
     private final AtomicReference<String> translatedText = new AtomicReference<>("こんにちは");
     private final AtomicReference<String> draft = new AtomicReference<>("（候補・要確認）");
     private final AtomicReference<String> document = new AtomicReference<>("（下書き・要確認）");
+    private final AtomicReference<String> summary = new AtomicReference<>("（要約）");
     private final AtomicReference<PlanStep> plan = new AtomicReference<>(PlanStep.finished());
+    private final java.util.concurrent.ConcurrentLinkedQueue<PlanStep> planQueue =
+            new java.util.concurrent.ConcurrentLinkedQueue<>();
 
     public void setResult(LlmResult r) { result.set(r); }
     public void setTranslatedText(String t) { translatedText.set(t); }
     public void setDraft(String d) { draft.set(d); }
     public void setDocument(String d) { document.set(d); }
+    public void setSummary(String s) { summary.set(s); }
     public void setPlan(PlanStep p) { plan.set(p); }
+
+    /** 设置多步规划序列（依次返回，耗尽后回退到 {@link #setPlan} 的值）。 */
+    public void setPlans(java.util.List<PlanStep> steps) {
+        planQueue.clear();
+        planQueue.addAll(steps);
+    }
 
     @Override
     public LlmResult generate(String question, List<RetrievedChunk> context) {
@@ -44,7 +54,13 @@ public class MockLlmProvider implements LLMProvider {
     }
 
     @Override
+    public String summarize(String instruction) {
+        return summary.get();
+    }
+
+    @Override
     public PlanStep planStep(String goal, List<String> toolSpecs, List<String> history) {
-        return plan.get();
+        PlanStep next = planQueue.poll();
+        return next != null ? next : plan.get();
     }
 }

@@ -32,10 +32,23 @@ public class AgentController {
     @PostMapping
     public AgentTaskDto create(@RequestBody CreateRequest req) {
         Tenant t = TenantContext.require();
+
+        String goal = req.goal() == null ? "" : req.goal().trim();
+        if (goal.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "goal required");
+        }
+        if (goal.length() > 2000) {
+            goal = goal.substring(0, 2000);
+        }
+        String mode = (req.mode() == null || req.mode().isBlank()) ? AgentTask.MODE_AUTO : req.mode();
+        if (!List.of(AgentTask.MODE_AUTO, AgentTask.MODE_LLM, AgentTask.MODE_RULE).contains(mode)) {
+            mode = AgentTask.MODE_AUTO;
+        }
+
         AgentTask task = tasks.save(AgentTask.builder()
                 .customerId(t.customerId()).storeId(t.storeId())
-                .goal(req.goal())
-                .mode(req.mode() == null || req.mode().isBlank() ? AgentTask.MODE_RULE : req.mode())
+                .goal(goal)
+                .mode(mode)
                 .status(AgentTask.STATUS_PENDING)
                 .createdAt(Instant.now()).updatedAt(Instant.now()).build());
         runner.runAsync(task.getId());

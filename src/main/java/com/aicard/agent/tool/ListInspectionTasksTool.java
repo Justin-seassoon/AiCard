@@ -36,6 +36,11 @@ public class ListInspectionTasksTool implements AgentTool {
     }
 
     @Override
+    public String argsHint() {
+        return "{\"status\":\"string (optional: pending/done/closed)\"}";
+    }
+
+    @Override
     public ToolResult run(AgentContext ctx, String argsJson) {
         String status = AgentArgs.text(AgentArgs.parse(argsJson), "status", null);
         List<InspectionTask> list = inspections.list(ctx.customerId(), ctx.storeId(), status);

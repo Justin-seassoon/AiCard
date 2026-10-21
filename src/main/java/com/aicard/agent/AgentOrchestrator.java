@@ -2,7 +2,9 @@ package com.aicard.agent;
 
 import com.aicard.agent.planner.AgentPlanner;
 import com.aicard.skb.provider.LLMProvider;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -15,28 +17,35 @@ import java.util.stream.Collectors;
 /**
  * ② 主循环：{@code plan → act → observe → reflect(确定性校验) → 重试}，逐步落库。
  *
- * <p><b>C5（租户跨异步）</b>：租户从**任务行**取（{@code task.customerId/storeId}）→ 构造
- * {@link AgentContext} 显式传给工具——不依赖 {@code TenantContext}（异步线程里它是空的）。
+ * <p><b>C5（租户跨异步）</b>：租户从**任务行**取 → {@link AgentContext} 显式传给工具。
+ * <p><b>护栏</b>：最大步数、任务总时限、未知工具 / 缺必填参数 → fail-stop 并给可读原因；
+ * 一步都没规划出来 → 明确失败（不伪造成功）。
  */
 @Service
 public class AgentOrchestrator {
 
     private static final int MAX_STEPS = 8;
     private static final int MAX_ATTEMPTS = 3; // 1 次 + 2 次重试
+    private static final int PLAN_ATTEMPTS = 3; // 规划调用重试（应对 LLM 网关瞬时错误）
 
     private final AgentTaskRepository tasks;
     private final ToolRegistry tools;
     private final AgentValidator validator;
+    private final ResultComposer composer;
     private final ObjectMapper mapper;
     private final Map<String, AgentPlanner> planners;
+    private final long maxDurationMs;
 
     public AgentOrchestrator(AgentTaskRepository tasks, ToolRegistry tools, AgentValidator validator,
-                             ObjectMapper mapper, List<AgentPlanner> planners) {
+                             ResultComposer composer, ObjectMapper mapper, List<AgentPlanner> planners,
+                             @Value("${agent.max-duration-ms:120000}") long maxDurationMs) {
         this.tasks = tasks;
         this.tools = tools;
         this.validator = validator;
+        this.composer = composer;
         this.mapper = mapper;
         this.planners = planners.stream().collect(Collectors.toMap(AgentPlanner::mode, p -> p));
+        this.maxDurationMs = maxDurationMs;
     }
 
     /** 执行任务（幂等于 taskId；由 {@link AgentRunner} 异步调用）。 */
@@ -49,17 +58,35 @@ public class AgentOrchestrator {
         task.setStatus(AgentTask.STATUS_RUNNING);
         touch(task);
 
+        long deadline = System.currentTimeMillis() + maxDurationMs;
         List<StepRecord> history = new ArrayList<>();
         try {
-            AgentPlanner planner = planners.getOrDefault(task.getMode(), planners.get(AgentTask.MODE_RULE));
-            for (int i = 0; i < MAX_STEPS; i++) {
-                LLMProvider.PlanStep plan = planner.next(task.getGoal(), tools.specs(), history, ctx);
-                if (plan == null || plan.done()) {
+            AgentPlanner planner = planners.getOrDefault(task.getMode(), planners.get(AgentTask.MODE_AUTO));
+            if (planner == null) {
+                fail(task, "未知の実行モード：" + task.getMode());
+            }
+            for (int i = 0; planner != null && i < MAX_STEPS; i++) {
+                if (System.currentTimeMillis() > deadline) {
+                    fail(task, "タスクが時間上限（" + maxDurationMs + "ms）を超えました");
                     break;
                 }
+
+                LLMProvider.PlanStep plan = planWithRetry(planner, task, history, ctx);
+                if (plan == null) {
+                    break; // 规划失败已写入 task.error
+                }
+                if (plan.done()) {
+                    break;
+                }
+
                 AgentTool tool = tools.get(plan.tool());
                 if (tool == null) {
-                    fail(task, "未知工具：" + plan.tool());
+                    fail(task, "未知のツール：" + plan.tool());
+                    break;
+                }
+                List<String> missing = AgentArgs.missing(AgentArgs.parse(plan.argsJson()), tool.requiredArgs());
+                if (!missing.isEmpty()) {
+                    fail(task, "ツール " + tool.name() + " の必須パラメータ不足：" + missing);
                     break;
                 }
 
@@ -78,15 +105,43 @@ public class AgentOrchestrator {
                     task.setArtifactBase64(Base64.getEncoder().encodeToString(exec.result().artifact()));
                 }
             }
+
             if (AgentTask.STATUS_RUNNING.equals(task.getStatus())) {
-                task.setStatus(AgentTask.STATUS_DONE);
-                task.setResult("完了：" + history.size() + " ステップ");
+                if (history.isEmpty()) {
+                    fail(task, "実行可能な手順を計画できませんでした（目標を具体的にしてください）");
+                } else if (AgentValidator.expectsArtifact(task.getGoal()) && task.getArtifactBase64() == null) {
+                    fail(task, "成果物が作成されませんでした（この目標にはファイル出力が必要です）");
+                } else {
+                    task.setStatus(AgentTask.STATUS_DONE);
+                    task.setResult(composer.compose(task.getGoal(), history, task.getArtifactName()));
+                }
             }
         } catch (Exception e) {
             fail(task, e.getClass().getSimpleName() + ": " + e.getMessage());
         }
         task.setSteps(toJson(history));
         touch(task);
+    }
+
+    /** 规划调用重试：LLM 网关瞬时错误不应拖垮整任务。失败返回 null（已写入 task.error）。 */
+    private LLMProvider.PlanStep planWithRetry(AgentPlanner planner, AgentTask task,
+                                               List<StepRecord> history, AgentContext ctx) {
+        RuntimeException last = null;
+        for (int attempt = 1; attempt <= PLAN_ATTEMPTS; attempt++) {
+            try {
+                return planner.next(task.getGoal(), tools.specs(), history, ctx);
+            } catch (RuntimeException e) {
+                last = e;
+                try {
+                    Thread.sleep(300L * attempt);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        fail(task, "実行計画の作成に失敗しました（" + (last == null ? "unknown" : last.getMessage()) + "）");
+        return null;
     }
 
     /** act → observe → reflect，失败重试（≤ {@link #MAX_ATTEMPTS}）。 */

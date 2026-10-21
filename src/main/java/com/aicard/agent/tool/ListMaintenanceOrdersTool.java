@@ -36,6 +36,11 @@ public class ListMaintenanceOrdersTool implements AgentTool {
     }
 
     @Override
+    public String argsHint() {
+        return "{\"status\":\"string (optional: open/processing/done)\"}";
+    }
+
+    @Override
     public ToolResult run(AgentContext ctx, String argsJson) {
         String status = AgentArgs.text(AgentArgs.parse(argsJson), "status", null);
         List<MaintenanceOrder> list = orders.list(ctx.customerId(), ctx.storeId(), status);

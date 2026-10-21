@@ -24,6 +24,7 @@ public class AgentTask {
 
     public static final String MODE_RULE = "rule";
     public static final String MODE_LLM = "llm";
+    public static final String MODE_AUTO = "auto";
 
     public static final String GOAL_ALERT_REPORT = "alert_report";
     public static final String GOAL_USAGE_REPORT = "usage_report";
@@ -38,7 +39,7 @@ public class AgentTask {
     @Column(name = "store_id", nullable = false)
     private Long storeId;
 
-    @Column(name = "goal", nullable = false, length = 32)
+    @Column(name = "goal", nullable = false, columnDefinition = "text")
     private String goal;
 
     @Column(name = "mode", nullable = false, length = 8)

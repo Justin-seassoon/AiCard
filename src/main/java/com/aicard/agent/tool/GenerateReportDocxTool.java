@@ -40,6 +40,16 @@ public class GenerateReportDocxTool implements AgentTool {
     }
 
     @Override
+    public String argsHint() {
+        return "{\"openOrders\":\"int\",\"inspectionIssues\":\"int\"}";
+    }
+
+    @Override
+    public java.util.List<String> requiredArgs() {
+        return java.util.List.of("openOrders", "inspectionIssues");
+    }
+
+    @Override
     public ToolResult run(AgentContext ctx, String argsJson) {
         var args = AgentArgs.parse(argsJson);
         int openOrders = AgentArgs.intVal(args, "openOrders", 0);

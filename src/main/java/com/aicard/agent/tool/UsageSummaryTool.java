@@ -35,6 +35,11 @@ public class UsageSummaryTool implements AgentTool {
     }
 
     @Override
+    public String argsHint() {
+        return "{\"days\":\"int (optional, default 7)\"}";
+    }
+
+    @Override
     public ToolResult run(AgentContext ctx, String argsJson) {
         int days = AgentArgs.intVal(AgentArgs.parse(argsJson), "days", 7);
         LocalDate end = LocalDate.now().plusDays(1);

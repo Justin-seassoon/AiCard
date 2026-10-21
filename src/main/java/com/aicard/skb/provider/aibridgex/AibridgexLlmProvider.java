@@ -66,6 +66,19 @@ public class AibridgexLlmProvider implements LLMProvider {
             2. 形式：{"tool":"ツール名","args":{...}} または {"done":true}
             3. 目標が達成されたら {"done":true} を出力してください。
             4. 一覧にあるツール名だけを使ってください。
+            5. args は各ツールの args ヒントに従ってください（必須項目を必ず入れる）。
+            6. 同じツールを意味なく繰り返さないでください。
+            """;
+
+    private static final String SUMMARY_PROMPT = """
+            あなたは業務アシスタントです。
+            実行結果だけを根拠に、ユーザーの目標に対する回答を日本語で簡潔に述べてください。
+            規則：
+            1. 実行結果に含まれる数値・件数・一覧を必ずそのまま使ってください。
+               例：usage_summary の turnCount は「翻訳件数」です。
+            2. 実行結果に無い内容を推測しないでください。
+            3. 1〜3 文で簡潔に。
+            4. 前置き・見出し・引用符は不要。本文のみを出力。
             """;
 
     private final String baseUrl;
@@ -225,11 +238,11 @@ public class AibridgexLlmProvider implements LLMProvider {
         }
     }
 
-    /** 容错解析规划输出：{"tool":..,"args":{..}} 或 {"done":true}；解析失败一律视为 done。 */
+    /** 容错解析规划输出；**解析失败一律抛错**（用于区分「模型说完成」与「模型输出坏了」）。 */
     private PlanStep parsePlan(String content) {
         String json = extractJson(content);
         if (json == null) {
-            return PlanStep.finished();
+            throw new ProviderException("plan: model output has no JSON");
         }
         try {
             JsonNode node = mapper.readTree(json);
@@ -238,12 +251,39 @@ public class AibridgexLlmProvider implements LLMProvider {
             }
             String tool = node.path("tool").asText("");
             if (tool.isBlank()) {
-                return PlanStep.finished();
+                throw new ProviderException("plan: missing 'tool' (and not done)");
             }
             String args = node.has("args") ? node.get("args").toString() : "{}";
             return PlanStep.tool(tool, args);
+        } catch (ProviderException e) {
+            throw e;
         } catch (Exception e) {
-            return PlanStep.finished();
+            throw new ProviderException("plan: unparseable model output", e);
+        }
+    }
+
+    @Override
+    public String summarize(String instruction) {
+        String url = baseUrl + "/chat/completions";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", SUMMARY_PROMPT),
+                        Map.of("role", "user", "content", instruction)));
+
+        try {
+            ResponseEntity<Map> resp = rest.postForEntity(url, new HttpEntity<>(body, headers), Map.class);
+            Map<String, Object> respBody = resp.getBody();
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) respBody.get("choices");
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            return (String) message.get("content");
+        } catch (Exception e) {
+            throw new ProviderException("aibridgex summarize failed", e);
         }
     }
 

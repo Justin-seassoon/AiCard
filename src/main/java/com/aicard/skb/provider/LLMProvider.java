@@ -26,6 +26,9 @@ public interface LLMProvider {
      */
     String draftDocument(String instruction);
 
+    /** 最终答复（② agent）：把执行结果概括成一句日语答复（不得超出执行结果）。 */
+    String summarize(String instruction);
+
     /**
      * 自主规划一步（② agent 执行）：给定目标、可用工具与执行历史，返回下一步工具调用，或标记完成。
      *

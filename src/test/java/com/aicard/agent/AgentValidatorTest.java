@@ -29,8 +29,17 @@ class AgentValidatorTest {
     }
 
     @Test
-    void reconcilesReportCountsAcrossSteps() {
-        StepRecord listed = new StepRecord("list_maintenance_orders", "{}", StepRecord.OK,
+    void detectsArtifactExpectation() {
+        assertThat(AgentValidator.expectsArtifact("レポートを作って")).isTrue();
+        assertThat(AgentValidator.expectsArtifact("修繕オーダーの一覧を Excel にして")).isTrue();
+        assertThat(AgentValidator.expectsArtifact("未回答の質問から社内通知を作って")).isTrue();
+        assertThat(AgentValidator.expectsArtifact("今週の翻訳件数は？")).isFalse();
+        assertThat(AgentValidator.expectsArtifact("何ができる？")).isFalse();
+        assertThat(AgentValidator.expectsArtifact(null)).isFalse();
+    }
+
+    @Test
+    void reconcilesReportCountsAcrossSteps() {        StepRecord listed = new StepRecord("list_maintenance_orders", "{}", StepRecord.OK,
                 "{\"count\":3}", null, 1, 1);
         List<StepRecord> history = List.of(listed);
 
