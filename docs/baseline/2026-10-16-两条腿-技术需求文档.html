@@ -207,7 +207,7 @@
         <tbody>
           <tr><td><b>① 自生长知识</b></td><td><b>已实现</b>：<code>qa_log(no_match)</code> → 缺口池 → LLM 起草 → 后台审核 → 入库</td><td><span class="st done">✅</span></td><td>落点 <code>skb/curation/</code> + 迁移 V18 <code>knowledge_gap</code> + 后台审核页</td></tr>
           <tr><td><b>③ 文档/文书处理</b></td><td><b>已实现</b>：报表导出 xlsx + 社内文书草稿 docx</td><td><span class="st done">✅</span></td><td><code>docgen/</code>（POI）+ C4 聚合泛化（deviceId 可空）</td></tr>
-          <tr><td><b>② agent 执行</b></td><td><b>已实现</b>：状态机 + 工具注册表 + 两种规划（rule/llm）+ 确定性校验/重试</td><td><span class="st done">✅</span></td><td><code>agent/</code>；C5 以「租户从任务行重建」落地</td></tr>
+          <tr><td><b>② agent 执行</b></td><td><b>已实现</b>：自然语言指令 → LLM 规划工具序列（auto/llm/rule）+ 确定性校验/重试 + 假完成检测 + 最终答复</td><td><span class="st done">✅</span></td><td><code>agent/</code>（10 个工具）；C5 以「租户从任务行重建」落地</td></tr>
           <tr><td>后台多用户</td><td>只有 device 代表「人」</td><td><span class="st todo">⬜</span></td><td>新增 <code>app_user</code>（C1 <span class="star">★</span>）</td></tr>
           <tr><td>后台登录/鉴权</td><td>信任请求头</td><td><span class="st todo">⬜</span></td><td>C2 <span class="star">★</span></td></tr>
         </tbody>
@@ -239,7 +239,7 @@
     <div class="road">
       <div class="road-step"><span class="n">①</span><span class="txt"><b>自生长知识</b> ✅ — 已实现（迁移 V18 + <code>skb/curation/</code> + 后台审核页）</span></div>
       <div class="road-step"><span class="n">③</span><span class="txt"><b>文档处理</b> ✅ — 已实现（<code>docgen/</code>：报表导出 xlsx + 社内文书 docx）</span></div>
-      <div class="road-step"><span class="n">②</span><span class="txt"><b>agent 执行</b> ✅ — 已实现（<code>agent/</code>：状态机 + 工具注册表 + rule/llm 规划 + 校验/重试）</span></div>
+      <div class="road-step"><span class="n">②</span><span class="txt"><b>agent 执行</b> ✅ — 已实现（<code>agent/</code>：自然语言指令 → LLM 规划工具序列 + 校验/重试 + 最终答复）</span></div>
     </div>
     <div class="tablewrap">
       <table>
