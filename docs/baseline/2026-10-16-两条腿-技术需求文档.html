@@ -217,7 +217,7 @@
 
   <section>
     <h2>4 · 横向能力需求（跨两腿，腿 B 前置）</h2>
-    <p>由架构冲突核查得出（逐条对照现有代码）。其中 <strong>C1 / C2 为「卖给真实客户」的商业化硬前置</strong>——<strong>本轮 demo 按单租户运行、不做 C1/C2，不阻塞开发</strong>（见 <code>docs/两腿demo-范围界定.md</code>）。</p>
+    <p>由架构冲突核查得出（逐条对照现有代码）。其中 <strong>C1 / C2 为「卖给真实客户」的商业化硬前置</strong>——<strong>本轮 demo 按单租户运行、不做 C1/C2，不阻塞开发</strong>（见 <code>docs/baseline/两腿demo-范围界定.md</code>）。</p>
     <div class="tablewrap">
       <table>
         <thead><tr><th>#</th><th>需求</th><th>现状</th><th>状态</th><th>等级</th></tr></thead>
@@ -235,7 +235,7 @@
 
   <section>
     <h2>5 · 能力路线图</h2>
-    <p><b>本轮 demo 范围与顺序见 <code>docs/两腿demo-范围界定.md</code></b>：①②③ 全做，仅排除 C1/C2 与多租户硬化；顺序 ① → ③ → ②。</p>
+    <p><b>本轮 demo 范围与顺序见 <code>docs/baseline/两腿demo-范围界定.md</code></b>：①②③ 全做，仅排除 C1/C2 与多租户硬化；顺序 ① → ③ → ②。</p>
     <div class="road">
       <div class="road-step"><span class="n">①</span><span class="txt"><b>自生长知识</b> ✅ — 已实现（迁移 V18 + <code>skb/curation/</code> + 后台审核页）</span></div>
       <div class="road-step"><span class="n">③</span><span class="txt"><b>文档处理</b> ✅ — 已实现（<code>docgen/</code>：报表导出 xlsx + 社内文书 docx）</span></div>
@@ -307,7 +307,7 @@
   <section>
     <h2>8 · 待决策 / 前置依赖</h2>
     <ul class="plain">
-      <li>✅ <b>已决</b>：做「① 端到端」——<b>①②③ 全做</b>，范围见 <code>docs/两腿demo-范围界定.md</code>。</li>
+      <li>✅ <b>已决</b>：做「① 端到端」——<b>①②③ 全做</b>，范围见 <code>docs/baseline/两腿demo-范围界定.md</code>。</li>
       <li>✅ <b>已决</b>：C1/C2 <b>本轮 demo 不做</b>（单租户运行）；作为<b>卖给真实客户</b>的前置保留，另行排期。</li>
       <li><b>C4/C5 的机制设计</b>（聚合维度、租户跨异步）——建议在做 ①③② 前先定。</li>
       <li>合规方向④由其他团队立项，本仓库<b>只统一话术</b>（模型可替换 + 数据驻留分层），不动代码。</li>

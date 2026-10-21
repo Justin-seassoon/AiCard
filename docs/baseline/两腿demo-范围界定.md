@@ -56,10 +56,11 @@ qa_log(status=no_match) → 缺口池聚合 → LLM 起草候选(带出处)
 - ⚠️ 优先走**结构化抽取 + 模板填充**（POI），**不引入代码沙箱**（重资产、Java 单体异构）。
 
 **② agent 执行**
-- 新增 `agent/`：任务状态机（持久化）+ 工具注册表 + `plan→act→observe→reflect`；
-- 把 `report` / `maintenance` / `notification` / `broadcast` / `skb` 注册为工具；
-- 前置 **C5**（租户跨异步传递机制）——`TenantContext` 是 ThreadLocal，长任务会丢租户；
-- ⚠️ **确定性校验优先**（数字/格式用纯函数校验，LLM 只做修复提案）；**重试/幂等**是刚需。
+- **自然语言指令 → LLM 规划工具序列**（`auto`：LLM 主 + 规则兜底；`llm`；`rule`）+ `plan→act→observe→reflect`；
+- 工具集固定、路径自由：`search_knowledge` / `list_maintenance_orders` / `list_inspection_tasks` / `usage_summary` / `list_knowledge_gaps` / `compose_docx` / `write_xlsx` / `list_capabilities` 等（共 10 个）；
+- 前置 **C5 已落地**：租户从任务行取 → 显式传给工具（不依赖 `TenantContext`）；
+- ⚠️ **确定性校验优先**（数字对账 / 产物非空）+ **重试/幂等**；**假完成检测**（要求文件却无产物 → 失败）；**最终答复**（ResultComposer）；
+- 用 **eval**（`scripts/agent-eval.sh`，15 条日语指令）量化成功率。
 
 ### 3.2 **仅两项不做**
 
@@ -86,7 +87,7 @@ qa_log(status=no_match) → 缺口池聚合 → LLM 起草候选(带出处)
 |---|---|
 | **①** | 一条 `no_match` 现场走完「捕获→起草→审核→入库」，入库后**可被检索命中** |
 | **③** | 一份「数据 → 文书文件（xlsx/docx）」端到端生成并可下载 |
-| **②** | 一个多步任务（如「汇总本周 X → 生成报告」）端到端跑通，**含失败重试 + 确定性校验** |
+| **②** | 自然语言指令 → 多步执行 → 交付文件 / 答复；**含失败重试 + 确定性校验 + 假完成检测**；eval 15 条指令完成率 ≥ 60% |
 | **腿 A** | 真机核心场景稳定演示 |
 | **整体** | **换来 N 场真实客户对话**（demo 的真正交付物） |
 
