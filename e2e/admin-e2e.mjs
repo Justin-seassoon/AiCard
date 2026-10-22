@@ -52,13 +52,34 @@ try {
   await page.waitForTimeout(1200);
   const gapRows = await page.locator('#gap-tbody tr').count();
   const gapEmpty = await page.locator('#gap-empty').isVisible();
-  console.log(`gap.data rows=${gapRows} emptyVisible=${gapEmpty} (${gapRows > 0 || gapEmpty ? 'PASS' : 'FAIL'})`);
+  const gapOk = gapRows > 0 || gapEmpty;
+  console.log(`gap.data rows=${gapRows} emptyVisible=${gapEmpty} (${gapOk ? 'PASS' : 'FAIL'})`);
+  if (gapOk) pass++; else fail++;
 
   await page.click('.tab[data-tab="agent"]');
   await page.waitForTimeout(1200);
   const agentRows = await page.locator('#ag-tbody tr').count();
   const agentEmpty = await page.locator('#ag-empty').isVisible();
-  console.log(`agent.data rows=${agentRows} emptyVisible=${agentEmpty} (${agentRows > 0 || agentEmpty ? 'PASS' : 'FAIL'})`);
+  const agentOk = agentRows > 0 || agentEmpty;
+  console.log(`agent.data rows=${agentRows} emptyVisible=${agentEmpty} (${agentOk ? 'PASS' : 'FAIL'})`);
+  if (agentOk) pass++; else fail++;
+
+  // 文档处理：模板清单 + 上传解析（日本 Excel：合并表头）
+  await page.click('.tab[data-tab="docgen"]');
+  await page.waitForTimeout(1500);
+  const tplCount = await page.locator('#tpl-select option').count();
+  const tplOk = tplCount >= 6;
+  console.log(`docgen.templates options=${tplCount} (${tplOk ? 'PASS' : 'FAIL'})`);
+  if (tplOk) pass++; else fail++;
+
+  const fixture = new URL('../src/test/resources/fixtures/f1_merged_header.xlsx', import.meta.url).pathname;
+  await page.setInputFiles('#doc-file', fixture);
+  await page.click('button:has-text("解析")');
+  await page.waitForTimeout(3500);
+  const preview = await page.locator('#doc-preview').innerText();
+  const parseOk = preview.includes('商品カテゴリ') && preview.includes('売上金額') && preview.includes('6 行');
+  console.log(`docgen.parse mergedHeader=${parseOk ? 'PASS' : 'FAIL'} :: ${preview.slice(0, 60).replace(/\s+/g, ' ')}`);
+  if (parseOk) pass++; else fail++;
 
   console.log(`\nRESULT pass=${pass} fail=${fail} jsErrors=${errors.length}`);
   if (errors.length) console.log(errors.join('\n'));
