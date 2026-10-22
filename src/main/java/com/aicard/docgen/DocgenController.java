@@ -2,6 +2,8 @@ package com.aicard.docgen;
 
 import com.aicard.common.tenant.Tenant;
 import com.aicard.common.tenant.TenantContext;
+import com.aicard.docgen.template.DocTemplate;
+import com.aicard.docgen.template.TemplateService;
 import com.aicard.report.repository.DeviceAggregate;
 import com.aicard.report.service.ReportService;
 import org.springframework.http.HttpHeaders;
@@ -15,6 +17,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 /** ③ 文档/文书处理 下载端点：报表导出 xlsx、社内文书草稿 docx。 */
 @RestController
@@ -26,11 +31,14 @@ public class DocgenController {
     private final ReportService reports;
     private final ReportXlsxWriter xlsx;
     private final BusinessDocWriter docx;
+    private final TemplateService templates;
 
-    public DocgenController(ReportService reports, ReportXlsxWriter xlsx, BusinessDocWriter docx) {
+    public DocgenController(ReportService reports, ReportXlsxWriter xlsx, BusinessDocWriter docx,
+                            TemplateService templates) {
         this.reports = reports;
         this.xlsx = xlsx;
         this.docx = docx;
+        this.templates = templates;
     }
 
     /** 导出报表为 xlsx；{@code deviceId} 省略 = 租户级（C4）。 */
@@ -53,6 +61,21 @@ public class DocgenController {
         return download(body, DOCX, "business-doc.docx");
     }
 
+    /** ③ B：模板清单。 */
+    @GetMapping("/api/docgen/templates")
+    public List<TemplateInfo> templates() {
+        return Arrays.stream(DocTemplate.values())
+                .map(t -> new TemplateInfo(t.id(), t.label(), t.format(), t.description()))
+                .toList();
+    }
+
+    /** ③ B：按模板生成文书（内容由 LLM 起草，排版由模板确定性渲染）。 */
+    @PostMapping("/api/docgen/documents")
+    public ResponseEntity<byte[]> document(@RequestBody DocRequest req) {
+        TemplateService.Generated g = templates.generate(req.template(), req.fields());
+        return download(g.bytes(), g.mime(), g.filename());
+    }
+
     private static ResponseEntity<byte[]> download(byte[] body, String contentType, String filename) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType(contentType));
@@ -61,4 +84,8 @@ public class DocgenController {
     }
 
     public record BusinessDocRequest(String docType, String topic, String points) {}
+
+    public record TemplateInfo(String id, String label, String format, String description) {}
+
+    public record DocRequest(String template, Map<String, Object> fields) {}
 }
