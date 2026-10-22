@@ -215,7 +215,7 @@
         <thead><tr><th>需求</th><th>说明</th><th>优先级</th><th>状态</th></tr></thead>
         <tbody>
           <tr><td><b>① 自生长知识</b></td><td>缺口捕获 → 聚合 → LLM 起草候选（带出处）→ <b>人工审核</b> → 入库</td><td>TBD</td><td><span class="st done">✅</span></td></tr>
-          <tr><td><b>③ 文档/文书处理</b></td><td>读写 Excel/PDF、生成社内文书草稿（敬语 / 商务格式）</td><td>TBD</td><td><span class="st done">✅</span></td></tr>
+          <tr><td><b>③ 文档/文书处理</b></td><td><b>读取</b> Excel/CSV（合并表头 / 全角 / 多 sheet / 和暦）+ <b>生成</b> 6 类文书（通知 / 回覧 / 報告 / 議事録 / 見積書 / 請求書）</td><td>TBD</td><td><span class="st done">✅</span></td></tr>
           <tr><td><b>② agent 执行</b></td><td>自然语言指令 → 多步执行（plan→act→observe→reflect）→ 交付文件 / 答复</td><td>TBD</td><td><span class="st done">✅</span></td></tr>
           <tr><td>后台多用户</td><td>事务员 / 管理员角色</td><td>P0（腿B）</td><td><span class="st todo">⬜</span></td></tr>
           <tr><td>登录 / 鉴权</td><td>真实登录，租户由鉴权推导</td><td>P0（腿B）</td><td><span class="st todo">⬜</span></td></tr>
@@ -275,7 +275,7 @@
     <h2>8 · 能力路线图（腿 B）</h2>
     <div class="road">
       <div class="road-step"><span class="n">①</span><span class="txt"><b>自生长知识</b> ✅ — 已实现（V18 + <code>skb/curation/</code> + 后台审核页）</span></div>
-      <div class="road-step"><span class="n">③</span><span class="txt"><b>文档处理</b> ✅ — 已实现（xlsx 报表导出 + docx 社内文书草稿）</span></div>
+      <div class="road-step"><span class="n">③</span><span class="txt"><b>文档处理</b> ✅ — 已实现（Excel/CSV 读取 + 6 类文书模板 + 报表导出）</span></div>
       <div class="road-step"><span class="n">②</span><span class="txt"><b>agent 执行</b> ✅ — 已实现（自然语言指令 → 多步执行 → 交付文件/答复）</span></div>
     </div>
     <p>技术落点与前置依赖见配对的技术需求文档 §3.3 / §5。</p>
