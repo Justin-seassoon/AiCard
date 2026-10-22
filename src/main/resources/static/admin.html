@@ -343,6 +343,35 @@
         <button class="primary" onclick="generateBusinessDoc()">生成草稿（docx）</button>
       </div>
     </div>
+
+    <div class="card">
+      <h2>文档读取（Excel / CSV）</h2>
+      <p style="color:#6E685C;font-size:13px;margin:-4px 0 12px;">
+        支持合并表头 / 全角 / 多 Sheet / 底部备注 / 和暦；文件按不可信数据处理，不落盘。
+      </p>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+        <input type="file" id="doc-file" accept=".xlsx,.xls,.csv">
+        <button class="primary" onclick="parseDocument()">解析</button>
+      </div>
+      <div id="doc-preview" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>模板生成（社内文书 / 帳票）</h2>
+      <div class="form-grid">
+        <div class="field"><label>模板</label><select id="tpl-select" onchange="syncTplFields()"></select></div>
+        <div class="field"><label>宛先</label><input id="tpl-to" placeholder="例：全社員"></div>
+        <div class="field full"><label>件名 <span class="req">*</span></label><input id="tpl-subject" placeholder="例：来月の全社会議の開催について"></div>
+        <div class="field full"><label>要点</label><textarea id="tpl-points" placeholder="例：日時 11/10 14:00、場所 本社会議室"></textarea></div>
+        <div class="field full" id="tpl-items-wrap" style="display:none;">
+          <label>明細（1 行 1 件：品目,数量,単価）</label>
+          <textarea id="tpl-items" placeholder="例：コピー用紙,10,500"></textarea>
+        </div>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="primary" onclick="generateFromTemplate()">生成并下载</button>
+      </div>
+    </div>
   </section>
 
   <!-- ==================== 任务执行（② agent） ==================== -->
@@ -445,7 +474,7 @@
       document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks, gap: loadGaps, docgen: function () {}, agent: loadAgentTasks };
+      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks, gap: loadGaps, docgen: loadDocgen, agent: loadAgentTasks };
       loader[btn.dataset.tab]();
     });
   });
@@ -871,6 +900,114 @@
       var body = '<pre style="white-space:pre-wrap;font-size:12px;">' + escapeHtml(JSON.stringify(t.steps, null, 2)) + '</pre>';
       openModal('<h3>任务 #' + t.id + '</h3>' + head + body);
     }).catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+
+  // ==================== 文档处理（③ 读取 / 模板） ====================
+  var DOC_TEMPLATES = [];
+  function loadDocgen() { loadTemplates(); }
+  function loadTemplates() {
+    fetch('/api/docgen/templates', { headers: { 'X-Customer-Id': customerId, 'X-Store-Id': storeId } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (list) {
+        DOC_TEMPLATES = list || [];
+        var sel = document.getElementById('tpl-select');
+        sel.innerHTML = DOC_TEMPLATES.map(function (t) {
+          return '<option value="' + escapeHtml(t.id) + '" data-format="' + escapeHtml(t.format) + '">'
+            + escapeHtml(t.label) + '（' + escapeHtml(t.format) + '）</option>';
+        }).join('');
+        syncTplFields();
+      })
+      .catch(function (e) { toast('模板加载失败：' + e.message, false); });
+  }
+  function syncTplFields() {
+    var sel = document.getElementById('tpl-select');
+    var opt = sel.options[sel.selectedIndex];
+    var fmt = opt ? opt.getAttribute('data-format') : '';
+    document.getElementById('tpl-items-wrap').style.display = (fmt === 'xlsx') ? '' : 'none';
+  }
+  function parseDocument() {
+    var f = document.getElementById('doc-file').files[0];
+    if (!f) { toast('请选择文件', false); return; }
+    var fd = new FormData();
+    fd.append('file', f);
+    document.getElementById('doc-preview').innerHTML = '<div class="empty">解析中…</div>';
+    fetch('/api/documents/parse', {
+      method: 'POST',
+      headers: { 'X-Customer-Id': customerId, 'X-Store-Id': storeId },
+      body: fd
+    })
+      .then(function (r) {
+        if (!r.ok) return r.text().then(function (t) { throw new Error('HTTP ' + r.status + ' ' + t); });
+        return r.json();
+      })
+      .then(renderParsed)
+      .catch(function (e) {
+        document.getElementById('doc-preview').innerHTML = '';
+        toast('解析失败：' + e.message, false);
+      });
+  }
+  function renderParsed(wb) {
+    var html = '';
+    (wb.warnings || []).forEach(function (w) {
+      html += '<div style="color:#b26a00;font-size:12px;">⚠ ' + escapeHtml(w) + '</div>';
+    });
+    (wb.sheets || []).forEach(function (s) {
+      html += '<h3 style="font-size:14px;margin:12px 0 6px;">' + escapeHtml(s.name)
+        + ' <span style="color:#888;font-weight:400;">（' + (s.rows || []).length + ' 行）</span></h3>';
+      (s.warnings || []).forEach(function (w) {
+        html += '<div style="color:#b26a00;font-size:12px;">⚠ ' + escapeHtml(w) + '</div>';
+      });
+      html += '<div class="table-wrap"><table><thead><tr>'
+        + (s.headers || []).map(function (h) { return '<th>' + escapeHtml(h) + '</th>'; }).join('')
+        + '</tr></thead><tbody>'
+        + (s.rows || []).slice(0, 10).map(function (row) {
+          return '<tr>' + row.map(function (c) { return '<td>' + escapeHtml(c) + '</td>'; }).join('') + '</tr>';
+        }).join('')
+        + '</tbody></table></div>';
+      if ((s.notes || []).length) {
+        html += '<div style="color:#888;font-size:12px;margin-top:4px;">备注：' + s.notes.map(escapeHtml).join('；') + '</div>';
+      }
+      if ((s.summaries || []).length) {
+        html += '<div style="color:#888;font-size:12px;">合计行：' + s.summaries.map(escapeHtml).join('；') + '</div>';
+      }
+    });
+    if (!html) { html = '<div class="empty">未识别到内容</div>'; }
+    document.getElementById('doc-preview').innerHTML = html;
+  }
+  function generateFromTemplate() {
+    var sel = document.getElementById('tpl-select');
+    if (!sel.value) { toast('请选择模板', false); return; }
+    var subject = document.getElementById('tpl-subject').value.trim();
+    if (!subject) { toast('请填写件名', false); return; }
+    var opt = sel.options[sel.selectedIndex];
+    var isXlsx = opt && opt.getAttribute('data-format') === 'xlsx';
+    var fields = {
+      '件名': subject,
+      '宛先': document.getElementById('tpl-to').value.trim(),
+      '要点': document.getElementById('tpl-points').value.trim()
+    };
+    if (isXlsx) {
+      var items = document.getElementById('tpl-items').value.split('\n').map(function (line) {
+        var p = line.split(',');
+        return p.length >= 3 ? { name: p[0].trim(), qty: p[1].trim(), unitPrice: p[2].trim() } : null;
+      }).filter(Boolean);
+      if (!items.length) { toast('帳票需要至少 1 条明細', false); return; }
+      fields.items = items;
+    }
+    fetch('/api/docgen/documents', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Customer-Id': customerId, 'X-Store-Id': storeId },
+      body: JSON.stringify({ template: sel.value, fields: fields })
+    })
+      .then(function (r) {
+        if (!r.ok) return r.text().then(function (t) { throw new Error('HTTP ' + r.status + ' ' + t); });
+        return r.blob();
+      })
+      .then(function (blob) {
+        downloadBlob(blob, sel.value + (isXlsx ? '.xlsx' : '.docx'));
+        toast('已生成', true);
+      })
+      .catch(function (e) { toast('生成失败：' + e.message, false); });
   }
 
   // ---------- modal ----------
