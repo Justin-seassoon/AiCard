@@ -110,7 +110,7 @@
   <header class="masthead">
     <span class="eyebrow">AI 工牌 · 技术需求</span>
     <h1>两条腿 · 技术需求基线</h1>
-    <p class="meta"><b>日期</b> 2026-10-16 &nbsp;·&nbsp; <b>用途</b> 统一认识 + 后续更新的单一技术基线 &nbsp;·&nbsp; <b>来源</b> 产品层见《日本中小企业市场与两条腿业务模式》</p>
+    <p class="meta"><b>日期</b> 2026-10-16（2026-10-23 增补会议纪要） &nbsp;·&nbsp; <b>用途</b> 统一认识 + 后续更新的单一技术基线 &nbsp;·&nbsp; <b>来源</b> 产品层见《日本中小企业市场与两条腿业务模式》</p>
   </header>
 
   <div class="legend">
@@ -144,7 +144,7 @@
 ║   │ 翻译链路 ✅        │  │ 知识库 SKB/VKB ✅         │  │ ① 自生长知识 ✅ │ ║
 ║   │ LID / 质量门控 ✅  │  │ 广播 ✅  通知 ✅          │  │ ③ 文档处理   ✅ │ ║
 ║   │ 供应商路由 ✅      │  │ 报表 🟡  维护/点检 ✅     │  │ ② agent 执行 ✅ │ ║
-║   │                   │  │ OTA ✅   采集 ✅          │  │                  │ ║
+║   │                   │  │ OTA ✅   采集 ✅          │  │ 会议纪要 🟡     │ ║
 ║   └───────────────────┘  └──────────────────────────┘  └─────────────────┘ ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║  能力 / 抽象层                                                             ║
@@ -153,14 +153,15 @@
 ║  数据层（PostgreSQL + pgvector ✅）                                        ║
 ║   已有：customer / store / device / document / chunk / qa_log /            ║
 ║         translation_sample / broadcast / notification / maintenance / …    ║
-║   缺： ⬜ app_user（用户 C1）；①②③ 相关表已建 ✅            ║
+║         meeting / meeting_chunk / meeting_action_item（V22）               ║
+║   缺： ⬜ app_user（用户 C1）；①②③ + 会议纪要 相关表已建 ✅            ║
 ╠══════════════════════════════════════════════════════════════════════════╣
 ║  外部依赖                                                                  ║
 ║   Azure Speech（japaneast）✅   Azure OpenAI embedding ✅   aibridgex ✅   ║
 ║   （合规：模型可替换 + 数据驻留分层 —— 其他团队单独立项，此处只统一话术）    ║
 ╚══════════════════════════════════════════════════════════════════════════╝</pre>
     </div>
-    <div class="callout"><b>读图要点：</b>腿 A 已基本跑通（绿）；腿 B 的三个能力（①②③）<b>已实现</b>（绿），两个硬前置（用户 <b>C1</b>、鉴权 <b>C2</b>）尚未落地（灰）。<b>共享核心</b>是两条腿的公共资产——腿 B 主要是「在共享核心上长出新前端与新能力」。</div>
+    <div class="callout"><b>读图要点：</b>腿 A 已基本跑通（绿）；腿 B 的三个能力（①②③）<b>已实现</b>（绿），两个硬前置（用户 <b>C1</b>、鉴权 <b>C2</b>）尚未落地（灰）。<b>共享核心</b>是两条腿的公共资产——腿 B 主要是「在共享核心上长出新前端与新能力」。<b>会议纪要</b>为新增能力：云端 P0 已实现（🟡），真机录音待硬件（P1）。</div>
   </section>
 
   <section>
@@ -208,8 +209,32 @@
           <tr><td><b>① 自生长知识</b></td><td><b>已实现</b>：<code>qa_log(no_match)</code> → 缺口池 → LLM 起草 → 后台审核 → 入库</td><td><span class="st done">✅</span></td><td>落点 <code>skb/curation/</code> + 迁移 V18 <code>knowledge_gap</code> + 后台审核页</td></tr>
           <tr><td><b>③ 文档/文书处理</b></td><td><b>已实现</b>：<b>读取 Excel/CSV</b>（合并表头 / 全角 / 多 sheet / 和暦 / 注入防护）+ <b>6 类文书模板</b>（社内文书 docx / 帳票 xlsx）+ 报表导出</td><td><span class="st done">✅</span></td><td><code>docgen/</code>（POI）+ V21 <code>doc_upload</code> + C4</td></tr>
           <tr><td><b>② agent 执行</b></td><td><b>已实现</b>：自然语言指令 → LLM 规划工具序列（auto/llm/rule）+ 确定性校验/重试 + 假完成检测 + 最终答复</td><td><span class="st done">✅</span></td><td><code>agent/</code>（10 个工具）；C5 以「租户从任务行重建」落地</td></tr>
+          <tr><td><b>会议录音与智能纪要（新增）</b></td><td><b>云端 P0 已实现并在测试服验证</b>：30 秒分片上传（幂等/断点/完整性核对）+ 转写（Mock/现有 ASR 分片）+ 结构化纪要（JSON→docx）+ 待办落库 + 审核 + 导出 + WAV 导入；以真实 Azure + LLM 跑通</td><td><span class="st part">🟡</span></td><td><code>meeting/</code> + V22；P1 真机长按/断点续传/Azure 批式转写/周报聚合；P2 说话人分离/业务分析</td></tr>
           <tr><td>后台多用户</td><td>只有 device 代表「人」</td><td><span class="st todo">⬜</span></td><td>新增 <code>app_user</code>（C1 <span class="star">★</span>）</td></tr>
-          <tr><td>后台登录/鉴权</td><td>信任请求头</td><td><span class="st todo">⬜</span></td><td>C2 <span class="star">★</span></td></tr>
+    <h3>3.4 会议域（新增 · 云端 P0）</h3>
+    <div class="diagramwrap">
+<pre class="diagram">长按录音（真机 P1 / 模拟器 P0 / 后台 WAV 导入）
+  → 30 秒分片 HTTP PUT（seq + sha256，幂等 / 断点续传）
+  → meeting_end(last_seq) → 完整性核对（missing_seqs，缺片仍可转写）
+  → 异步：转写 → 结构化纪要 JSON（带时间戳根拠）→ 待办落库
+  → 后台编辑 / 人工审核 → docx 导出；录音 30 天到期删除（保留转写/纪要）</pre>
+    </div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>项</th><th>设计</th></tr></thead>
+        <tbody>
+          <tr><td>设备接口</td><td><code>POST /api/meetings/start</code> → <code>meeting_id</code>；<code>PUT /api/meetings/{id}/chunks/{seq}</code>；<code>POST /api/meetings/{id}/end</code>；鉴权 <code>X-Device-Id</code> + <code>X-Device-Token</code></td></tr>
+          <tr><td>音频导入</td><td><code>POST /api/meetings/import</code>（multipart WAV，PCM16；自动下混/重采样到 16k mono）→ 同一套分片/转写/纪要；用于<b>无麦克风（HTTP 环境）</b>或会议系统/手机录音</td></tr>
+          <tr><td>后台接口</td><td><code>GET /api/meetings</code>、<code>GET /{id}</code>、<code>PUT /{id}/minutes</code>、<code>POST /{id}/approve</code>、<code>POST /{id}/regenerate</code>、<code>GET /{id}/export.docx</code>、<code>GET /{id}/audio</code></td></tr>
+          <tr><td>状态机</td><td><code>recording → uploading → transcribing → drafting → draft → reviewed</code>；异常 <code>failed</code>；缺片记录 <code>missing_seqs</code></td></tr>
+          <tr><td>数据</td><td><code>meeting</code> / <code>meeting_chunk</code> / <code>meeting_action_item</code>（V22）；租户 <code>customer_id + store_id</code></td></tr>
+          <tr><td>存储</td><td>音频落共享卷 <code>meeting.storage-dir</code>（默认 <code>/data/meetings</code>），<b>多容器必须挂同一卷</b>；按 <code>{customerId}/{meetingId}/{seq}.pcm</code></td></tr>
+          <tr><td>异步 / 租户</td><td>处理进程从会议行取租户（C5），不依赖 <code>TenantContext</code>；失败只影响本会议</td></tr>
+          <tr><td>转写</td><td>P0：Mock（演示）或现有 <code>SpeechProvider.transcribe</code> 按 60 秒分组；P1：Azure Batch Transcription（长音频 + diarization）</td></tr>
+          <tr><td>纪要</td><td>LLM 输出 JSON → 归一化（缺字段「要確認」）→ <code>DocxRenderer</code> 确定性排版；人工编辑后回到 <code>draft</code> 重新审核</td></tr>
+          <tr><td>兜底</td><td>10 分钟无新分片自动 finalize；录音 30 天到期删除；定时任务幂等</td></tr>
+          <tr><td>测试</td><td>全量 <b>199 项</b>（会议 17 项：WavPcm 5 / Service 5 / Minutes 2 / AudioStore 2 / Integration 3）；测试服浏览器 E2E：后台 13/13、WAV 导入 6/6</td></tr>
+          <tr><td>部署</td><td>测试服 4 容器共享 <code>/data/meetings</code>；V22 自动迁移；HTTP 环境麦克风需 HTTPS，已提供 <b>WAV 导入</b>兜底</td></tr>
         </tbody>
       </table>
     </div>
@@ -235,11 +260,12 @@
 
   <section>
     <h2>5 · 能力路线图</h2>
-    <p><b>本轮 demo 范围与顺序见 <code>docs/baseline/两腿demo-范围界定.md</code></b>：①②③ 全做，仅排除 C1/C2 与多租户硬化；顺序 ① → ③ → ②。</p>
+    <p><b>本轮 demo 范围与顺序见 <code>docs/baseline/两腿demo-范围界定.md</code></b>：①②③ 全做，另加会议纪要云端 P0；仅排除 C1/C2 与多租户硬化；顺序 ① → ③ → ②。</p>
     <div class="road">
       <div class="road-step"><span class="n">①</span><span class="txt"><b>自生长知识</b> ✅ — 已实现（迁移 V18 + <code>skb/curation/</code> + 后台审核页）</span></div>
       <div class="road-step"><span class="n">③</span><span class="txt"><b>文档处理</b> ✅ — 已实现（<code>docgen/</code>：读取 Excel/CSV + 6 类文书模板 + 报表导出）</span></div>
       <div class="road-step"><span class="n">②</span><span class="txt"><b>agent 执行</b> ✅ — 已实现（<code>agent/</code>：自然语言指令 → LLM 规划工具序列 + 校验/重试 + 最终答复）</span></div>
+      <div class="road-step"><span class="n">M</span><span class="txt"><b>会议纪要（新增）</b> 🟡 — 云端 P0 已实现并在测试服验证（V22 + <code>meeting/</code> + 后台页 + 模拟器 + WAV 导入）</span></div>
     </div>
     <div class="tablewrap">
       <table>
@@ -248,6 +274,7 @@
           <tr><td><b>①</b></td><td>缺口捕获 → 聚合 → LLM 起草候选 → <b>人工审核</b> → 入库（<code>document.status: draft→published</code>）</td><td>本轮 demo 单租户，无需 C1/C2</td><td><span class="st done">✅</span></td></tr>
           <tr><td><b>③</b></td><td><code>docgen/</code> → 报表导出 xlsx + 社内文书 docx</td><td>C4（已落地）</td><td><span class="st done">✅</span></td></tr>
           <tr><td><b>②</b></td><td><code>agent/</code>（状态机 + 工具注册表 + plan/act/observe/reflect）</td><td>C5（已落地）</td><td><span class="st done">✅</span></td></tr>
+          <tr><td><b>会议纪要</b></td><td><code>meeting/</code>（分片上传 + 转写 + 结构化纪要 + 待办 + 审核/导出）</td><td>无（P0 不依赖真机/鉴权）</td><td><span class="st part">🟡 云端 P0 ✅ / 真机 P1 ⬜</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -264,6 +291,7 @@
           <tr><td>业务</td><td>翻译·知识·广播·通知·维护·OTA·采集</td><td><span class="st done">✅</span></td></tr>
           <tr><td>业务</td><td>报表</td><td><span class="st part">🟡</span></td></tr>
           <tr><td>业务</td><td>①自生长知识 / ③文档 / ②agent</td><td><span class="st done">✅</span> <span class="st done">✅</span> <span class="st done">✅</span></td></tr>
+          <tr><td>业务</td><td>会议纪要（新增）</td><td><span class="st part">🟡 云端 P0 ✅ / 真机 P1 ⬜</span></td></tr>
           <tr><td>抽象</td><td>Speech·LLM·Embedding Provider</td><td><span class="st done">✅</span></td></tr>
           <tr><td>数据</td><td>业务表 / 用户·候选·任务表</td><td><span class="st done">✅</span> / <span class="st todo">⬜</span></td></tr>
           <tr><td>横切</td><td>C1★ C2★ C3 C6</td><td><span class="st todo">⬜ ×4</span></td></tr>
@@ -296,18 +324,21 @@
           <tr><td><b>① 自生长知识</b></td><td><code>skb/curation/</code> · 迁移含 <code>knowledge_gap</code>（V18）</td></tr>
           <tr><td><b>③ 文档生成</b></td><td>pom 含 <code>poi</code> · <code>docgen/</code></td></tr>
           <tr><td><b>② agent 执行</b></td><td><code>agent/</code> · 迁移含 <code>agent_task</code>（V19）</td></tr>
+          <tr><td><b>会议纪要（新增）</b></td><td><code>meeting/</code> · 迁移含 <code>meeting</code>（V22） · <code>meeting/WavPcm.java</code>（WAV 导入）</td></tr>
           <tr><td><b>C1 用户模型</b></td><td>迁移含 <code>app_user</code>（缺）</td></tr>
           <tr><td><b>C2 鉴权</b></td><td>pom 含 <code>spring-boot-starter-security</code>（缺）</td></tr>
         </tbody>
       </table>
     </div>
-    <div class="callout"><b>机制：</b>脚本把本文档声称的状态编码为「期望值」对照代码——<b>代码变了而文档没改，就报 ⚠️</b>，提示更新。<br><b>运行结果（2026-10-16）：</b>一致 20 项 / 漂移 0 项。<br><b>边界：</b>锚点验证「存在性 / 结构」（覆盖约 80% 的「做没做」）；「行为对不对」靠测试 + 人复核。</div>
+    <div class="callout"><b>机制：</b>脚本把本文档声称的状态编码为「期望值」对照代码——<b>代码变了而文档没改，就报 ⚠️</b>，提示更新。<br><b>运行结果（2026-10-23）：</b>一致 25 项 / 漂移 0 项。<br><b>边界：</b>锚点验证「存在性 / 结构」（覆盖约 80% 的「做没做」）；「行为对不对」靠测试 + 人复核。</div>
   </section>
 
   <section>
     <h2>8 · 待决策 / 前置依赖</h2>
     <ul class="plain">
       <li>✅ <b>已决</b>：做「① 端到端」——<b>①②③ 全做</b>，范围见 <code>docs/baseline/两腿demo-范围界定.md</code>。</li>
+      <li>✅ <b>已决（2026-10-23）</b>：新增「会议录音与智能纪要」——云端 P0 先做（模拟器演示，不阻塞 12 月 demo）；真机长按/分片上传为 P1；定位个人视角会议笔记；音频保留 30 天。</li>
+      <li>✅ <b>已部署测试服（2026-10-23）</b>：4 容器 + 共享卷 <code>/data/meetings</code> + V22 自动迁移；以 <b>WAV 导入 + 真实 Azure/LLM</b> 验证；HTTP 麦克风需 HTTPS（测试服走 WAV 导入）。</li>
       <li>✅ <b>已决</b>：C1/C2 <b>本轮 demo 不做</b>（单租户运行）；作为<b>卖给真实客户</b>的前置保留，另行排期。</li>
       <li><b>C4/C5 的机制设计</b>（聚合维度、租户跨异步）——建议在做 ①③② 前先定。</li>
       <li>合规方向④由其他团队立项，本仓库<b>只统一话术</b>（模型可替换 + 数据驻留分层），不动代码。</li>

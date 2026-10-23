@@ -47,12 +47,16 @@ chk "旁路采集"       present f ingestion/service/IngestionService.java
 chk "供应商抽象(语音)" present f provider/api/SpeechProvider.java
 chk "供应商抽象(LLM)"  present f skb/provider/LLMProvider.java
 
-echo "=== 腿 B / 横向（①②③ 已实现；C1/C2 待开发）==="
+echo "=== 腿 B / 横向（①②③ 已实现；会议纪要云端 P0；C1/C2 待开发）==="
 chk "① 自生长知识(skb/curation)" present d skb/curation
 chk "① knowledge_gap 表"        present mig knowledge_gap
 chk "③ 文档生成(poi/docx)"       present pom poi
 chk "② agent 模块"              present d agent
 chk "② agent_task 表"           present mig agent_task
+chk "会议纪要模块(meeting)"      present d meeting
+chk "会议表(meeting)"            present mig "CREATE TABLE meeting"
+chk "会议后台接口"               present f meeting/MeetingAdminController.java
+chk "会议 WAV 导入"              present f meeting/WavPcm.java
 chk "C1 用户模型(app_user)"      absent mig app_user
 chk "C2 鉴权(Spring Security)"   absent pom spring-boot-starter-security
 

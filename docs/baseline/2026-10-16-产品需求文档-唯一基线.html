@@ -103,7 +103,7 @@
   <header class="masthead">
     <span class="eyebrow">AI 工牌 · 产品需求</span>
     <h1>两条腿 · 产品需求基线</h1>
-    <p class="meta"><b>日期</b> 2026-10-16 &nbsp;·&nbsp; <b>用途</b> 产品级统一基线，团队与开发对齐产品需求的唯一来源 &nbsp;·&nbsp; <b>配对</b> 《两条腿技术需求基线》</p>
+    <p class="meta"><b>日期</b> 2026-10-16（2026-10-23 增补会议纪要） &nbsp;·&nbsp; <b>用途</b> 产品级统一基线，团队与开发对齐产品需求的唯一来源 &nbsp;·&nbsp; <b>配对</b> 《两条腿技术需求基线》</p>
   </header>
 
   <div class="legend">
@@ -132,7 +132,8 @@
     </div>
     <p><strong>靶心</strong>：日本「中小企業 标准档」（约 50–300 人，有事务职能、有预算、有稟議），不碰极小规模。</p>
     <div class="callout"><b>价值主张：效率 × 沉淀</b> —— 使用者为「效率」来用，顺手零边际成本沉淀进企业知识；知识越用越准 → 效率更高 → 更多人用。</div>
-    <div class="callout accent"><b>产品红线：「成事」而非「防人」</b> —— 帮一线把事做成、守住红线、帮中层协调；<b>不做</b>实时定位、暗中录音、摸鱼监控、承诺账簿式盯人。</div>
+    <div class="callout accent"><b>产品红线：「成事」而非「防人」</b> —— 帮一线把事做成、守住红线、帮中层协调；<b>不做</b>实时定位、<b>未告知/未同意的录音</b>、摸鱼监控、承诺账簿式盯人。</div>
+    <div class="callout"><b>会议录音</b>是员工主动发起、明确告知的公开录音，与「暗中录音」不同：录音中有视觉/听觉提示、不可远程静默开启、访问留痕，并提供录音告知/同意话术模板。</div>
   </section>
 
   <section>
@@ -217,12 +218,15 @@
           <tr><td><b>① 自生长知识</b></td><td>缺口捕获 → 聚合 → LLM 起草候选（带出处）→ <b>人工审核</b> → 入库</td><td>TBD</td><td><span class="st done">✅</span></td></tr>
           <tr><td><b>③ 文档/文书处理</b></td><td><b>读取</b> Excel/CSV（合并表头 / 全角 / 多 sheet / 和暦）+ <b>生成</b> 6 类文书（通知 / 回覧 / 報告 / 議事録 / 見積書 / 請求書）</td><td>TBD</td><td><span class="st done">✅</span></td></tr>
           <tr><td><b>② agent 执行</b></td><td>自然语言指令 → 多步执行（plan→act→observe→reflect）→ 交付文件 / 答复</td><td>TBD</td><td><span class="st done">✅</span></td></tr>
+          <tr><td><b>会议录音与智能纪要（新增）</b></td><td>工牌长按录音（P0 用模拟器/上传音频）→ 分段上传 → 日语转写 → 结构化纪要 + 待办 → <b>人工审核</b> → 导出；周报基于已审核纪要</td><td>P0（云端）/ P1（真机）</td><td><span class="st part">🟡 云端 P0 ✅（测试服已验证）/ 真机 P1 ⬜</span></td></tr>
           <tr><td>后台多用户</td><td>事务员 / 管理员角色</td><td>P0（腿B）</td><td><span class="st todo">⬜</span></td></tr>
           <tr><td>登录 / 鉴权</td><td>真实登录，租户由鉴权推导</td><td>P0（腿B）</td><td><span class="st todo">⬜</span></td></tr>
         </tbody>
       </table>
     </div>
-    <p>三项新能力的<b>优先级按零件齐备度排序：① → ③ → ②</b>（见 §8）。<b>本轮 demo 范围见 <code>docs/baseline/两腿demo-范围界定.md</code></b>：①②③ 全做，仅排除「用户/登录/鉴权」与「多租户硬化」（故上方「后台多用户 / 登录鉴权」本轮不做，按单租户运行）。</p>
+    <p>三项新能力的<b>优先级按零件齐备度排序：① → ③ → ②</b>（见 §8）。<b>本轮 demo 范围见 <code>docs/baseline/两腿demo-范围界定.md</code></b>：①②③ 全做，另加「会议纪要」云端 P0；仅排除「用户/登录/鉴权」与「多租户硬化」（故上方「后台多用户 / 登录鉴权」本轮不做，按单租户运行）。</p>
+    <p><b>会议纪要范围</b>：P0 = 云端全链路（分片上传 / 转写 / 结构化纪要 / 待办 / 审核 / 导出）+ 模拟器演示 + <b>WAV 音频导入</b>（无麦克风/HTTP 环境）；P1 = 真机长按 + 断点续传 + 周报聚合；P2 = 说话人分离、业务分析报告。定位为<b>「个人视角的会议笔记」</b>（匹配工牌 0.5–1.5m 收音规格），不作会议室级正式纪要承诺。</p>
+    <p><b>验证状态（2026-10-23）</b>：云端 P0 已部署测试服，并以<b>真实 Azure 转写 + LLM</b> 跑通「WAV 导入 → 纪要 + 待办 → 审核 → docx 导出」；HTTP 环境麦克风需 HTTPS，故测试服走 WAV 导入路径。</p>
   </section>
 
   <section>
@@ -233,6 +237,7 @@
       <li>「経費精算の締め日は？」→ <b>带依据</b>即时答（知识沉淀）；</li>
       <li>「来月の会議の案内文を作って」→ 文书草稿作成；</li>
       <li>「今週の異常を整理して」→ 多步汇总 → 交付文档。</li>
+      <li><b>会议场景（新增）</b>：员工长按工牌录音 → 转写 → 标准纪要 + 待办（负责人/期限不明显示「要確認」）→ 审核 → 「本周参加的五场会」汇总为个人周报。</li>
     </ul>
   </section>
 
@@ -245,6 +250,7 @@
           <tr><td><b>性能（腿 A）</b></td><td>翻译会话启动 ≤1s；TTS 打断 ≤500ms；翻译响应延迟 VAD 尾包→TTS 首帧 ≤2s（理想 ≤1.5s）</td><td><span class="st done">✅</span></td></tr>
           <tr><td><b>可靠性</b></td><td>长稳 12h+；网络恢复不快重启；异常安全降级</td><td><span class="st done">✅</span></td></tr>
           <tr><td><b>合规</b></td><td>口径「<b>模型可替换 + 数据驻留分层</b>」；「<b>不用于训练</b>」明示；<b>禁用</b>「数据不出日本」（方向④他团队立项，此处只统一话术）</td><td><span class="st todo">⬜ 待统一话术</span></td></tr>
+          <tr><td><b>会议录音合规</b></td><td>仅<b>公开录音</b>（员工主动发起 + 现场提示 + 出席者知情）；<b>不可远程静默开启</b>；音频默认保留 <b>30 天</b>到期删除，保留转写/纪要；访问留痕</td><td><span class="st part">🟡 状态/清理已实现；告知话术待补</span></td></tr>
           <tr><td><b>安全</b></td><td>租户隔离不跨客户 / 门店 / scope；<b>后台真实鉴权</b></td><td><span class="st part">🟡 隔离✅ / 鉴权⬜</span></td></tr>
           <tr><td><b>可用性（腿 B）</b></td><td>零培训、零运维；日语支持</td><td><span class="st todo">⬜</span></td></tr>
         </tbody>
@@ -277,9 +283,10 @@
       <div class="road-step"><span class="n">①</span><span class="txt"><b>自生长知识</b> ✅ — 已实现（V18 + <code>skb/curation/</code> + 后台审核页）</span></div>
       <div class="road-step"><span class="n">③</span><span class="txt"><b>文档处理</b> ✅ — 已实现（Excel/CSV 读取 + 6 类文书模板 + 报表导出）</span></div>
       <div class="road-step"><span class="n">②</span><span class="txt"><b>agent 执行</b> ✅ — 已实现（自然语言指令 → 多步执行 → 交付文件/答复）</span></div>
+      <div class="road-step"><span class="n">M</span><span class="txt"><b>会议纪要（新增）</b> 🟡 — P0 云端已实现并在测试服验证（V22 + <code>meeting/</code> + 后台页 + 模拟器 + WAV 导入）；P1 真机长按/断点续传/周报聚合；P2 说话人分离/业务分析</span></div>
     </div>
     <p>技术落点与前置依赖见配对的技术需求文档 §3.3 / §5。</p>
-    <p><b>本轮 demo 范围与顺序见 <code>docs/baseline/两腿demo-范围界定.md</code></b>：①②③ 全做，仅排除 C1/C2 与多租户硬化；顺序 ① → ③ → ②。</p>
+    <p><b>本轮 demo 范围与顺序见 <code>docs/baseline/两腿demo-范围界定.md</code></b>：①②③ 全做，另加会议纪要云端 P0；仅排除 C1/C2 与多租户硬化；顺序 ① → ③ → ②。</p>
   </section>
 
   <section>
@@ -292,6 +299,7 @@
           <tr><td>腿 A 待联调</td><td>耳机增强、端侧固件</td><td><span class="st part">🟡</span></td></tr>
           <tr><td>共享后台</td><td>管理接口</td><td><span class="st part">🟡</span></td></tr>
           <tr><td>腿 B 产品能力</td><td>① 自生长知识 / ③ 文档 / ② agent</td><td>①<span class="st done">✅</span> / ③<span class="st done">✅</span> / ②<span class="st done">✅</span></td></tr>
+          <tr><td>会议纪要（新增）</td><td>云端 P0（分片/转写/纪要/待办/审核/导出/WAV 导入）/ 真机录音</td><td><span class="st part">🟡 云端✅（测试服验证）/ 真机⬜</span></td></tr>
           <tr><td>腿 B 前置</td><td>多用户、登录鉴权</td><td><span class="st todo">⬜</span></td></tr>
           <tr><td>合规话术</td><td>「模型可替换 + 数据驻留分层」「不用于训练」</td><td><span class="st todo">⬜</span></td></tr>
         </tbody>
@@ -303,6 +311,7 @@
     <h2>10 · 待决策</h2>
     <ul class="plain">
       <li>✅ <b>已决</b>：做「① 端到端」，且 <b>①②③ 全做</b>（范围见 <code>docs/baseline/两腿demo-范围界定.md</code>）；用户 / 鉴权本轮不做。</li>
+      <li>✅ <b>已决（2026-10-23）</b>：新增「会议录音与智能纪要」——<b>云端先做</b>（P0，不阻塞 12 月 demo）；定位<b>个人视角会议笔记</b>；音频<b>保留 30 天</b>；业务分析报告放 P2。</li>
       <li>腿 B 的<b>首发场景</b>选哪个。</li>
       <li>合规话术统一的时点（是否随材料改写一并做）。</li>
     </ul>

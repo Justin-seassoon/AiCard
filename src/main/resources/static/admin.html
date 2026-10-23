@@ -116,6 +116,7 @@
     <button class="tab" data-tab="inspection">点检任务</button>
     <button class="tab" data-tab="gap">知识缺口</button>
     <button class="tab" data-tab="docgen">社内文书</button>
+    <button class="tab" data-tab="meeting">会议纪要</button>
     <button class="tab" data-tab="agent">任务执行</button>
   </nav>
 
@@ -374,6 +375,66 @@
     </div>
   </section>
 
+  <!-- ==================== 会议纪要（新增） ==================== -->
+  <section id="panel-meeting" class="panel">
+    <div class="card">
+      <h2>音频导入（无麦克风 / HTTP 环境测试）</h2>
+      <p style="color:#6E685C;font-size:13px;margin:-4px 0 12px;">
+        上传 WAV（PCM 16-bit；采样率/声道自动转为 16k 单声道）→ 走与工牌相同的分片、转写、纪要流程。
+      </p>
+      <div class="form-grid">
+        <div class="field"><label>WAV 文件 <span class="req">*</span></label>
+          <input type="file" id="mtg-import-file" accept=".wav,audio/wav"></div>
+        <div class="field"><label>设备ID（可空）</label>
+          <input id="mtg-import-device" placeholder="留空则用本租户第一台设备"></div>
+        <div class="field"><label>会议标题（可空）</label>
+          <input id="mtg-import-title" placeholder="默认用文件名"></div>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="primary" onclick="importMeetingAudio()">导入并生成纪要</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>会議録音・議事録</h2>
+      <p style="color:#6E685C;font-size:13px;margin:-4px 0 12px;">
+        工牌长按录音（P0 用模拟器演示）→ 分片上传 → 日语转写 → 结构化纪要 + 待办。
+        <b>生成后须人工审核</b>；录音 30 天后自动删除。
+      </p>
+      <div class="form-grid">
+        <div class="field">
+          <label>状态</label>
+          <select id="mtg-q-status">
+            <option value="">全部</option>
+            <option value="recording">录音中</option>
+            <option value="uploading">上传中</option>
+            <option value="transcribing">转写中</option>
+            <option value="drafting">生成中</option>
+            <option value="draft">待审核</option>
+            <option value="reviewed">已审核</option>
+            <option value="failed">失败</option>
+          </select>
+        </div>
+        <div class="field" style="display:flex;align-items:flex-end;">
+          <button class="secondary" onclick="loadMeetings()">刷新</button>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px;">
+        <table>
+          <thead><tr><th>开始</th><th>会议ID</th><th>设备</th><th>担当</th><th>状态</th><th>长度</th><th>缺失</th><th>操作</th></tr></thead>
+          <tbody id="mtg-tbody"></tbody>
+        </table>
+        <div class="empty" id="mtg-empty" style="display:none;">暂无会议</div>
+      </div>
+    </div>
+
+    <div class="card" id="mtg-detail" style="display:none;">
+      <h2 id="mtg-detail-title">会议详情</h2>
+      <div id="mtg-detail-meta" style="font-size:13px;color:#6E685C;margin:-4px 0 12px;"></div>
+      <div id="mtg-detail-body"></div>
+    </div>
+  </section>
+
   <!-- ==================== 任务执行（② agent） ==================== -->
   <section id="panel-agent" class="panel">
     <div class="card">
@@ -474,7 +535,7 @@
       document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks, gap: loadGaps, docgen: loadDocgen, agent: loadAgentTasks };
+      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks, gap: loadGaps, docgen: loadDocgen, meeting: loadMeetings, agent: loadAgentTasks };
       loader[btn.dataset.tab]();
     });
   });
@@ -490,6 +551,8 @@
   var NTF_STATUS = { scheduled: ['已排期', 'blue'], sent: ['已发送', 'green'], cancelled: ['已取消', 'gray'] };
   var GAP_STATUS = { open: ['待处理', 'blue'], drafted: ['已起草', 'orange'], approved: ['已入库', 'green'], rejected: ['已驳回', 'gray'] };
   var AGENT_STATUS = { pending: ['待执行', 'blue'], running: ['执行中', 'orange'], done: ['已完成', 'green'], failed: ['失败', 'gray'] };
+  var MEETING_STATUS = { recording: ['录音中', 'blue'], uploading: ['上传中', 'blue'], transcribing: ['转写中', 'orange'], drafting: ['生成中', 'orange'], draft: ['待审核', 'orange'], reviewed: ['已审核', 'green'], failed: ['失败', 'red'] };
+  var ACTION_STATUS = { todo: ['未着手', 'blue'], doing: ['进行中', 'orange'], done: ['已完成', 'green'], cancelled: ['已取消', 'gray'] };
   var GOAL_LABEL = { alert_report: '异常汇总报告', usage_report: '用量周报' };
   function badge(map, key) {
     var e = map[key] || [key, 'gray'];
@@ -1009,6 +1072,249 @@
       })
       .catch(function (e) { toast('生成失败：' + e.message, false); });
   }
+
+  // ==================== 会议纪要 ====================
+  var CURRENT_MEETING = null;
+  var MEETING_POLL = null;
+
+  function importMeetingAudio() {
+    var f = document.getElementById('mtg-import-file').files[0];
+    if (!f) { toast('请选择 WAV 文件', false); return; }
+    var fd = new FormData();
+    fd.append('file', f);
+    var dev = document.getElementById('mtg-import-device').value.trim();
+    if (dev) fd.append('device_id', dev);
+    var title = document.getElementById('mtg-import-title').value.trim();
+    if (title) fd.append('title', title);
+    toast('上传中…', true);
+    fetch('/api/meetings/import', {
+      method: 'POST',
+      headers: { 'X-Customer-Id': customerId, 'X-Store-Id': storeId },
+      body: fd
+    })
+      .then(function (r) {
+        if (!r.ok) return r.text().then(function (t) { throw new Error('HTTP ' + r.status + ' ' + t); });
+        return r.json();
+      })
+      .then(function (d) {
+        toast('已导入，处理中', true);
+        loadMeetings();
+        setTimeout(function () { showMeeting(d.meeting_id); }, 1500);
+      })
+      .catch(function (e) { toast('导入失败：' + e.message, false); });
+  }
+
+  function loadMeetings() {
+    var st = document.getElementById('mtg-q-status').value;
+    api('/api/meetings' + (st ? '?status=' + encodeURIComponent(st) : ''))
+      .then(function (list) {
+        var rows = (list || []).map(function (m) {
+          var missing = (m.missing_seqs || []).length;
+          return '<tr>'
+            + '<td>' + fmtTime(m.started_at) + '</td>'
+            + '<td class="mono">' + escapeHtml(m.meeting_id) + '</td>'
+            + '<td class="mono">' + escapeHtml(m.device_id) + '</td>'
+            + '<td>' + escapeHtml(m.staff_name || '—') + '</td>'
+            + '<td>' + badge(MEETING_STATUS, m.status)
+            + (missing ? ' <span class="badge red">欠落 ' + missing + '</span>' : '') + '</td>'
+            + '<td>' + (m.duration_sec != null ? fmtDuration(m.duration_sec) : '—') + '</td>'
+            + '<td>' + (missing || '—') + '</td>'
+            + '<td><div class="row-actions"><button class="small primary" onclick="showMeeting(\''
+            + escAttr(m.meeting_id) + '\')">详情</button></div></td>'
+            + '</tr>';
+        }).join('');
+        setTbody('mtg-tbody', rows, 'mtg-empty', (list || []).length);
+      })
+      .catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+
+  function showMeeting(id) {
+    if (MEETING_POLL) { clearTimeout(MEETING_POLL); MEETING_POLL = null; }
+    api('/api/meetings/' + encodeURIComponent(id)).then(function (d) {
+      CURRENT_MEETING = d;
+      var m = d.minutes_json || {};
+      document.getElementById('mtg-detail').style.display = '';
+      document.getElementById('mtg-detail-title').textContent = '会議 ' + d.meeting_id;
+      document.getElementById('mtg-detail-meta').innerHTML = badge(MEETING_STATUS, d.status)
+        + ' · 開始 ' + fmtTime(d.started_at)
+        + ' · 長さ ' + (d.duration_sec != null ? fmtDuration(d.duration_sec) : '—')
+        + ' · 音声 ' + (d.audio_available ? 'あり（' + fmtTime(d.audio_expires_at) + ' まで）' : '削除済み')
+        + (d.error_message ? ' · <span style="color:#c62828;">' + escapeHtml(d.error_message) + '</span>' : '');
+
+      var body = '';
+      if (!d.minutes_json) {
+        body += '<div class="empty">'
+          + (d.status === 'failed' ? '生成失败，请点「再生成」' : '转写 / 生成中，可稍后刷新')
+          + '</div>';
+      }
+      body += '<div class="form-grid">'
+        + mtgField('件名', 'mtg-title', d.title || m.title || '')
+        + mtgField('日時', 'mtg-datetime', m.datetime || '')
+        + mtgField('場所', 'mtg-location', m.location || '')
+        + mtgField('出席者（逗号分隔）', 'mtg-attendees', (m.attendees || []).join('、'))
+        + mtgArea('議題（每行一条）', 'mtg-topics', mtgLines(m.topics), 'full')
+        + mtgArea('討議内容（每行一条）', 'mtg-discussion', mtgLines(m.discussion), 'full')
+        + mtgArea('決定事項（每行：内容|根拠）', 'mtg-decisions', mtgDecisionsText(m.decisions), 'full')
+        + mtgArea('保留事項（每行一条）', 'mtg-pending', mtgLines(m.pending), 'full')
+        + mtgField('次回', 'mtg-next', m.next_meeting || '')
+        + '</div>';
+      body += '<h3 style="font-size:14px;margin:16px 0 8px;">アクション（待办 · 可改状态）</h3>'
+        + '<div class="table-wrap"><table><thead><tr><th>任务</th><th>负责人</th><th>期限</th><th>根拠</th><th>状态</th></tr></thead>'
+        + '<tbody id="mtg-actions"></tbody></table></div>'
+        + '<div style="margin-top:8px;"><button class="secondary small" onclick="addMeetingAction()">＋ 追加待办</button></div>';
+      body += '<h3 style="font-size:14px;margin:16px 0 8px;">文字起こし</h3>'
+        + '<pre style="white-space:pre-wrap;font-size:12px;background:#f6f8fa;padding:12px;border-radius:6px;max-height:260px;overflow:auto;">'
+        + escapeHtml(d.transcript || '（なし）') + '</pre>';
+      body += '<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">'
+        + '<button class="primary" onclick="saveMeeting()">保存</button>'
+        + '<button class="primary" onclick="approveMeeting()"' + (d.status === 'reviewed' ? ' disabled' : '') + '>审核通过</button>'
+        + '<button class="secondary" onclick="regenerateMeeting()">再生成</button>'
+        + '<button class="secondary" onclick="exportMeetingDocx()">导出 docx</button>'
+        + '<button class="secondary" onclick="playMeetingAudio()"' + (d.audio_available ? '' : ' disabled') + '>播放录音</button>'
+        + '</div><div id="mtg-audio" style="margin-top:10px;"></div>';
+      document.getElementById('mtg-detail-body').innerHTML = body;
+      renderMeetingActions(d.actions || []);
+      // 处理中：轮询详情直到生成完成/失败
+      if (['recording', 'uploading', 'transcribing', 'drafting'].indexOf(d.status) >= 0) {
+        MEETING_POLL = setTimeout(function () { showMeeting(id); }, 3000);
+      } else {
+        loadMeetings();
+      }
+    }).catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+
+  function renderMeetingActions(actions) {
+    var html = actions.map(function (a) {
+      return '<tr data-action-id="' + (a.id || '') + '">'
+        + '<td><input class="mtg-a-task" value="' + escAttr(a.task || '') + '" style="width:100%;"></td>'
+        + '<td><input class="mtg-a-owner" value="' + escAttr(a.owner || '要確認') + '" style="width:110px;"></td>'
+        + '<td><input class="mtg-a-due" value="' + escAttr(a.due_date || '要確認') + '" style="width:110px;"></td>'
+        + '<td class="mono">' + escapeHtml(a.source_ref || '') + '</td>'
+        + '<td>' + mtgStatusSelect(a.status) + '</td>'
+        + '</tr>';
+    }).join('');
+    document.getElementById('mtg-actions').innerHTML = html;
+  }
+
+  function addMeetingAction() {
+    var tbody = document.getElementById('mtg-actions');
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td><input class="mtg-a-task" style="width:100%;" placeholder="タスク"></td>'
+      + '<td><input class="mtg-a-owner" value="要確認" style="width:110px;"></td>'
+      + '<td><input class="mtg-a-due" value="要確認" style="width:110px;"></td>'
+      + '<td class="mono"></td>'
+      + '<td>' + mtgStatusSelect('todo') + '</td>';
+    tbody.appendChild(tr);
+  }
+
+  function collectMeetingActions() {
+    return Array.prototype.map.call(document.querySelectorAll('#mtg-actions tr'), function (tr) {
+      return {
+        task: tr.querySelector('.mtg-a-task').value.trim(),
+        owner: tr.querySelector('.mtg-a-owner').value.trim(),
+        due_date: tr.querySelector('.mtg-a-due').value.trim(),
+        status: tr.querySelector('.mtg-a-status').value,
+        source_ref: tr.children[3].textContent.trim()
+      };
+    }).filter(function (a) { return a.task; });
+  }
+
+  function saveMeeting() {
+    if (!CURRENT_MEETING) return;
+    var minutes = {
+      title: mtgVal('mtg-title'),
+      datetime: mtgVal('mtg-datetime'),
+      location: mtgVal('mtg-location'),
+      attendees: mtgVal('mtg-attendees').split(/[、,]/).map(function (s) { return s.trim(); }).filter(Boolean),
+      topics: mtgLinesFrom('mtg-topics'),
+      discussion: mtgLinesFrom('mtg-discussion'),
+      decisions: mtgParseDecisions(mtgVal('mtg-decisions')),
+      pending: mtgLinesFrom('mtg-pending'),
+      next_meeting: mtgVal('mtg-next')
+    };
+    api('/api/meetings/' + encodeURIComponent(CURRENT_MEETING.meeting_id) + '/minutes', 'PUT', {
+      title: minutes.title,
+      minutes_json: minutes,
+      actions: collectMeetingActions()
+    }).then(function () {
+      toast('已保存（修改后需重新审核）', true);
+      showMeeting(CURRENT_MEETING.meeting_id);
+    }).catch(function (e) { toast('保存失败：' + e.message, false); });
+  }
+
+  function approveMeeting() {
+    if (!CURRENT_MEETING) return;
+    api('/api/meetings/' + encodeURIComponent(CURRENT_MEETING.meeting_id) + '/approve', 'POST', {})
+      .then(function () { toast('已审核通过', true); showMeeting(CURRENT_MEETING.meeting_id); loadMeetings(); })
+      .catch(function (e) { toast('审核失败：' + e.message, false); });
+  }
+
+  function regenerateMeeting() {
+    if (!CURRENT_MEETING) return;
+    api('/api/meetings/' + encodeURIComponent(CURRENT_MEETING.meeting_id) + '/regenerate', 'POST', {})
+      .then(function () { toast('已提交再生成', true); setTimeout(function () { showMeeting(CURRENT_MEETING.meeting_id); }, 1500); })
+      .catch(function (e) { toast('再生成失败：' + e.message, false); });
+  }
+
+  function exportMeetingDocx() {
+    if (!CURRENT_MEETING) return;
+    var id = CURRENT_MEETING.meeting_id;
+    fetch('/api/meetings/' + encodeURIComponent(id) + '/export.docx', {
+      headers: { 'X-Customer-Id': customerId, 'X-Store-Id': storeId }
+    })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+      .then(function (blob) { downloadBlob(blob, 'meeting-' + id + '.docx'); toast('已下载', true); })
+      .catch(function (e) { toast('导出失败：' + e.message, false); });
+  }
+
+  function playMeetingAudio() {
+    if (!CURRENT_MEETING) return;
+    var id = CURRENT_MEETING.meeting_id;
+    fetch('/api/meetings/' + encodeURIComponent(id) + '/audio', {
+      headers: { 'X-Customer-Id': customerId, 'X-Store-Id': storeId }
+    })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+      .then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        document.getElementById('mtg-audio').innerHTML = '<audio controls autoplay src="' + url + '" style="width:100%;"></audio>';
+      })
+      .catch(function (e) { toast('播放失败：' + e.message, false); });
+  }
+
+  function fmtDuration(sec) {
+    sec = Number(sec) || 0;
+    var m = Math.floor(sec / 60), s = sec % 60;
+    return m + '分' + (s ? s + '秒' : '');
+  }
+  function mtgVal(id) { return document.getElementById(id).value.trim(); }
+  function mtgLines(v) { return (v || []).join('\n'); }
+  function mtgLinesFrom(id) {
+    return mtgVal(id).split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+  }
+  function mtgDecisionsText(v) {
+    return (v || []).map(function (d) { return (d.text || '') + (d.ref ? '|' + d.ref : ''); }).join('\n');
+  }
+  function mtgParseDecisions(text) {
+    return text.split('\n').map(function (line) {
+      line = line.trim();
+      if (!line) return null;
+      var p = line.split('|');
+      return { text: p[0].trim(), ref: (p[1] || '').trim() };
+    }).filter(Boolean);
+  }
+  function mtgStatusSelect(selected) {
+    return '<select class="mtg-a-status">' + Object.keys(ACTION_STATUS).map(function (k) {
+      return '<option value="' + k + '"' + (k === selected ? ' selected' : '') + '>' + ACTION_STATUS[k][0] + '</option>';
+    }).join('') + '</select>';
+  }
+  function mtgField(label, id, value) {
+    return '<div class="field"><label>' + label + '</label><input id="' + id + '" value="' + escAttr(value) + '"></div>';
+  }
+  function mtgArea(label, id, value, cls) {
+    return '<div class="field ' + (cls || '') + '"><label>' + label + '</label><textarea id="' + id + '">'
+      + escapeHtml(value) + '</textarea></div>';
+  }
+  function escAttr(s) { return escapeHtml(s).replace(/"/g, '&quot;'); }
 
   // ---------- modal ----------
   function openModal(html) {

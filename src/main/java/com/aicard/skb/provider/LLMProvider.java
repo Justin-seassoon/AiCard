@@ -30,6 +30,18 @@ public interface LLMProvider {
     String summarize(String instruction);
 
     /**
+     * 会议纪要起草：把带时间戳的转写整理成**结构化 JSON**（議題 / 決定事項 / 保留事項 / アクション）。
+     * <ul>
+     *   <li>只依据转写内容，不推测未出现的事实；负责人/期限不明确时必须写「要確認」。</li>
+     *   <li>决定事項/アクション尽量带转写时间戳（ref），作为根拠。</li>
+     *   <li>默认返回 {@code null}（供应商未实现时由调用方走确定性兜底）。</li>
+     * </ul>
+     */
+    default String draftMinutes(String transcript) {
+        return null;
+    }
+
+    /**
      * 自主规划一步（② agent 执行）：给定目标、可用工具与执行历史，返回下一步工具调用，或标记完成。
      *
      * @param toolSpecs 可用工具清单（名 + 描述）

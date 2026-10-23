@@ -11,6 +11,7 @@ const TABS = [
   { id: 'inspection', heading: '新建点检任务' },
   { id: 'gap', heading: '知识缺口' },
   { id: 'docgen', heading: '社内文書 下書き作成' },
+  { id: 'meeting', heading: '会議録音・議事録' },
   { id: 'agent', heading: '多步任务执行' },
 ];
 
@@ -63,6 +64,14 @@ try {
   const agentOk = agentRows > 0 || agentEmpty;
   console.log(`agent.data rows=${agentRows} emptyVisible=${agentEmpty} (${agentOk ? 'PASS' : 'FAIL'})`);
   if (agentOk) pass++; else fail++;
+
+  await page.click('.tab[data-tab="meeting"]');
+  await page.waitForTimeout(1200);
+  const mtgRows = await page.locator('#mtg-tbody tr').count();
+  const mtgEmpty = await page.locator('#mtg-empty').isVisible();
+  const mtgOk = mtgRows > 0 || mtgEmpty;
+  console.log(`meeting.data rows=${mtgRows} emptyVisible=${mtgEmpty} (${mtgOk ? 'PASS' : 'FAIL'})`);
+  if (mtgOk) pass++; else fail++;
 
   // 文档处理：模板清单 + 上传解析（日本 Excel：合并表头）
   await page.click('.tab[data-tab="docgen"]');

@@ -7,7 +7,9 @@
     "e2e": "node admin-e2e.mjs",
     "e2e:local": "node admin-e2e.mjs http://localhost:8080",
     "e2e:test": "node admin-e2e.mjs http://120.253.215.108:38081",
-    "e2e:templates": "node templates-e2e.mjs http://120.253.215.108:38081"
+    "e2e:templates": "node templates-e2e.mjs http://120.253.215.108:38081",
+    "e2e:meeting": "node meeting-e2e.mjs http://120.253.215.108:38081",
+    "e2e:meeting-import": "node meeting-import-e2e.mjs http://120.253.215.108:38081"
   },
   "devDependencies": {
     "playwright": "^1.64.1"

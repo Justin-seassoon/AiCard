@@ -10,8 +10,9 @@ spring:
     name: aicard
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 12MB
+      # 会议音频导入（WAV 1 小时 16k PCM ≈ 115MB）；文档上传控制器另有 10MB 上限
+      max-file-size: 200MB
+      max-request-size: 210MB
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/aicard}
     username: ${DB_USER:aicard}
@@ -55,6 +56,16 @@ ota:
   sign-secret: ${OTA_SIGN_SECRET:ota-demo-sign-secret}
   url-expires-sec: 3600
   public-base-url: ${OTA_PUBLIC_BASE_URL:}
+meeting:
+  # 音频共享卷：多容器部署必须挂同一卷，否则后台读不到网关写入的分片
+  storage-dir: ${MEETING_STORAGE_DIR:/data/meetings}
+  retention-days: ${MEETING_RETENTION_DAYS:30}
+  chunk-sec: 30
+  finalize-after-minutes: 10
+  finalize-scan-ms: 300000
+  cleanup-cron: "0 20 3 * * *"
+  language: ja-JP
+  max-chunk-bytes: 2097152
 management:
   endpoints:
     web:

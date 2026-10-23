@@ -139,6 +139,22 @@
     </div>
   </div>
 
+  <!-- 会议纪要（P0 云端链路） -->
+  <div class="card">
+    <div class="row"><label style="font-weight:700;">📝 会议录音 → 纪要（P0 云端）</label></div>
+    <div class="row">
+      <button id="btn-meeting" class="btn-primary" onclick="toggleMeeting()">开始会议录音</button>
+      <span id="meeting-status" style="font-size:13px;color:#486581;">未开始</span>
+    </div>
+    <div class="row" style="font-size:12px;color:#829ab1;">
+      使用上方 device_id / token 鉴权；每 30 秒自动上传一段。结束后到后台「会议纪要」查看。
+    </div>
+    <div id="meeting-secure-hint" class="vkb-hint" style="margin-top:8px;">
+      ⚠ 当前是 HTTP 环境，浏览器会禁用麦克风。请改用后台「会议纪要 → 音频导入（WAV）」。
+    </div>
+    <div id="meeting-info" style="font-size:12px;color:#486581;"></div>
+  </div>
+
   <!-- 状态 -->
   <div class="card">
     <div class="status-row">
@@ -172,6 +188,15 @@
   var currentSequence = 0;
   var pendingPcm = [];       // 累积未发送的 Int16 样本
   var talkStartMs = 0;
+
+  // 会议录音（HTTP 分片上传，P0）
+  var meetingActive = false;
+  var meetingId = null;
+  var meetingSeq = 0;
+  var meetingPcm = [];
+  var meetingQueue = [];
+  var meetingUploading = false;
+  var MEETING_CHUNK_SAMPLES = 16000 * 30;
 
   // TTS 播放累积
   var ttsChunks = {};        // turnId → 剥头后的 Int16 PCM 分片数组（按 turn 隔离，避免广播/翻译交错）
@@ -309,15 +334,22 @@
   }
 
   function onAudioProcess(ev) {
-    if (!recording) return;
+    if (!recording && !meetingActive) return;
     var input = ev.inputBuffer.getChannelData(0);
     var float16 = resample(input, audioCtx.sampleRate, 16000);
     var int16 = toInt16(float16);
-    for (var i = 0; i < int16.length; i++) pendingPcm.push(int16[i]);
-    // 每 100ms（1600 样本）切一个分片发送
-    while (pendingPcm.length >= 1600) {
-      var chunk = pendingPcm.splice(0, 1600);
-      sendAudioChunk(int16ToBytes(chunk));
+    if (recording) {
+      for (var i = 0; i < int16.length; i++) pendingPcm.push(int16[i]);
+      // 每 100ms（1600 样本）切一个分片发送
+      while (pendingPcm.length >= 1600) {
+        var chunk = pendingPcm.splice(0, 1600);
+        sendAudioChunk(int16ToBytes(chunk));
+      }
+    } else {
+      for (var j = 0; j < int16.length; j++) meetingPcm.push(int16[j]);
+      while (meetingPcm.length >= MEETING_CHUNK_SAMPLES) {
+        enqueueMeetingChunk(meetingPcm.splice(0, MEETING_CHUNK_SAMPLES));
+      }
     }
   }
 
@@ -374,6 +406,7 @@
 
   // ===== PTT =====
   function startTalking() {
+    if (meetingActive) { log('会议录音中，请先结束会议', 'err'); return; }
     if (!connected) { log('请先连接', 'err'); return; }
     ensureAudio().then(function () {
       recording = true;
@@ -408,6 +441,127 @@
       input_source: 'badge_far'
     });
     log('结束说话（eou）', 'in');
+  }
+
+  // ===== 会议录音（HTTP 分片上传，P0） =====
+  function toggleMeeting() {
+    if (meetingActive) { stopMeeting(); } else { startMeeting(); }
+  }
+
+  function startMeeting() {
+    if (recording) { log('说话中，请先松开', 'err'); return; }
+    var deviceId = $('deviceId').value.trim();
+    var token = $('token').value.trim();
+    if (!deviceId || !token) { log('会议录音需要 device_id / token', 'err'); return; }
+    ensureAudio().then(function () {
+      fetch('/api/meetings/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId, 'X-Device-Token': token },
+        body: JSON.stringify({
+          client_key: uuid(), codec: 'pcm16', sample_rate: 16000, chunk_sec: 30,
+          title: '会議 ' + new Date().toLocaleString('ja-JP')
+        })
+      }).then(function (r) {
+        if (!r.ok) return r.text().then(function (t) { throw new Error('HTTP ' + r.status + ' ' + t); });
+        return r.json();
+      }).then(function (m) {
+        meetingId = m.meeting_id;
+        meetingSeq = 0;
+        meetingPcm = [];
+        meetingQueue = [];
+        meetingUploading = false;
+        meetingActive = true;
+        $('btn-meeting').textContent = '结束会议录音';
+        $('btn-meeting').classList.add('recording');
+        $('meeting-status').textContent = '录音中 · ' + meetingId;
+        updateMeetingInfo();
+        log('会议开始 meeting_id=' + meetingId, 'sys');
+      }).catch(function (e) {
+        log('会议开始失败：' + e.message, 'err');
+        $('meeting-status').textContent = '开始失败';
+      });
+    }).catch(function () {});
+  }
+
+  function stopMeeting() {
+    if (!meetingActive) return;
+    meetingActive = false;
+    if (meetingPcm.length) {
+      enqueueMeetingChunk(meetingPcm.splice(0));
+    }
+    $('btn-meeting').textContent = '开始会议录音';
+    $('btn-meeting').classList.remove('recording');
+    $('meeting-status').textContent = '上传中…';
+    waitMeetingUploads(function () {
+      var deviceId = $('deviceId').value.trim();
+      var token = $('token').value.trim();
+      fetch('/api/meetings/' + encodeURIComponent(meetingId) + '/end', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId, 'X-Device-Token': token },
+        body: JSON.stringify({ last_seq: meetingSeq - 1 })
+      }).then(function (r) {
+        if (!r.ok) return r.text().then(function (t) { throw new Error('HTTP ' + r.status + ' ' + t); });
+        return r.json();
+      }).then(function (e) {
+        $('meeting-status').textContent = '已结束 · 处理中（后台查看）';
+        log('会议结束 missing=' + e.missing_count + ' status=' + e.status, 'sys');
+      }).catch(function (err) {
+        $('meeting-status').textContent = '结束失败';
+        log('会议结束失败：' + err.message, 'err');
+      });
+    }, 0);
+  }
+
+  function enqueueMeetingChunk(samples) {
+    if (!samples || !samples.length) return;
+    meetingQueue.push({ seq: meetingSeq++, bytes: int16ToBytes(samples) });
+    updateMeetingInfo();
+    pumpMeetingQueue();
+  }
+
+  function pumpMeetingQueue() {
+    if (meetingUploading || !meetingQueue.length || !meetingId) return;
+    var item = meetingQueue[0];
+    meetingUploading = true;
+    fetch('/api/meetings/' + encodeURIComponent(meetingId) + '/chunks/' + item.seq, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        'X-Device-Id': $('deviceId').value.trim(),
+        'X-Device-Token': $('token').value.trim()
+      },
+      body: item.bytes
+    }).then(function (r) {
+      if (!r.ok) return r.text().then(function (t) { throw new Error('HTTP ' + r.status + ' ' + t); });
+    }).then(function () {
+      meetingQueue.shift();
+      updateMeetingInfo();
+    }).catch(function (e) {
+      log('分片上传失败（3 秒后重试）：' + e.message, 'err');
+      setTimeout(pumpMeetingQueue, 3000);
+    }).finally(function () {
+      meetingUploading = false;
+      if (meetingQueue.length) pumpMeetingQueue();
+    });
+  }
+
+  function waitMeetingUploads(cb, tries) {
+    tries = tries || 0;
+    if (!meetingUploading && !meetingQueue.length) { cb(); return; }
+    if (tries > 60) {
+      log('上传超时，按已上传分片结束（缺失分片会在后台标记）', 'err');
+      cb();
+      return;
+    }
+    $('meeting-status').textContent = '上传中… 剩余 ' + (meetingQueue.length + (meetingUploading ? 1 : 0)) + ' 段';
+    setTimeout(function () { waitMeetingUploads(cb, tries + 1); }, 1000);
+  }
+
+  function updateMeetingInfo() {
+    if (!meetingId) return;
+    $('meeting-info').textContent = 'meeting_id=' + meetingId
+      + ' · 已切分 ' + meetingSeq + ' 段'
+      + (meetingQueue.length ? ' · 待上传 ' + meetingQueue.length + ' 段' : '');
   }
 
   // ===== 下行消息处理 =====
@@ -551,6 +705,13 @@
     sendJson({ type: 'broadcast_ack', session_id: sessionId, broadcast_id: currentBroadcastId });
     log('✅ 已回执广播 #' + currentBroadcastId, 'sys');
     $('btn-bc-ack').disabled = true;
+  }
+
+  // HTTP（非安全上下文）下浏览器禁用麦克风：提示改用后台 WAV 导入
+  if (!window.isSecureContext) {
+    $('meeting-secure-hint').style.display = 'block';
+    $('btn-meeting').disabled = true;
+    $('meeting-status').textContent = 'HTTP 环境不可用麦克风';
   }
 </script>
 </body>

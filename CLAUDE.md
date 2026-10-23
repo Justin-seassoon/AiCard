@@ -99,6 +99,6 @@ TTS 音频回包 -> 设备扬声器外放
 - `provider/` 供应商抽象（SpeechProvider、ProviderRouter）
 - `skb/` 员工知识库（受控 RAG + LLM/Embedding）
 - `broadcast/` 分组多语言广播（群组 + 广播编排 + 投递回执）
-- `ingestion/` 旁路采集；`admin/` 运营后台；`common/` 租户/领域/仓储
+- `ingestion/` 旁路采集；`meeting/` 会议录音与智能纪要；`admin/` 运营后台；`common/` 租户/领域/仓储
 
 详见各 `docs/` 与 `deploy-docs/运维部署说明.md`。

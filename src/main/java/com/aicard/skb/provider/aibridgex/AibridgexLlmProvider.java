@@ -81,6 +81,21 @@ public class AibridgexLlmProvider implements LLMProvider {
             4. 前置き・見出し・引用符は不要。本文のみを出力。
             """;
 
+    private static final String MINUTES_PROMPT = """
+            あなたは日本の企業の会議議事録作成アシスタントです。
+            与えられた文字起こしだけを根拠に、構造化された議事録を JSON で作成してください。
+            規則：
+            1. 出力は JSON オブジェクト 1 つだけ（他の文字・コードブロックは一切出さない）。
+            2. 形式：
+               {"title":"...","datetime":"...","location":"...","attendees":["..."],
+                "topics":["..."],"discussion":["..."],
+                "decisions":[{"text":"...","ref":"00:00"}],
+                "pending":["..."],"next_meeting":"...",
+                "actions":[{"task":"...","owner":"...","due":"...","ref":"00:00"}]}
+            3. 文字起こしに無い事実を推測・創作しないでください。不明な項目は「要確認」。
+            4. 決定事項・アクションには、根拠となる発言の時刻（ref）を付けてください。
+            5. 日本語で簡潔に。""";
+
     private final String baseUrl;
     private final String apiKey;
     private final String model;
@@ -284,6 +299,31 @@ public class AibridgexLlmProvider implements LLMProvider {
             return (String) message.get("content");
         } catch (Exception e) {
             throw new ProviderException("aibridgex summarize failed", e);
+        }
+    }
+
+    @Override
+    public String draftMinutes(String transcript) {
+        String url = baseUrl + "/chat/completions";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", MINUTES_PROMPT),
+                        Map.of("role", "user", "content", "文字起こし：\n" + transcript)));
+
+        try {
+            ResponseEntity<Map> resp = rest.postForEntity(url, new HttpEntity<>(body, headers), Map.class);
+            Map<String, Object> respBody = resp.getBody();
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) respBody.get("choices");
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            return (String) message.get("content");
+        } catch (Exception e) {
+            throw new ProviderException("aibridgex draftMinutes failed", e);
         }
     }
 
