@@ -17,11 +17,19 @@ public class MeetingConfig {
     @Value("${meeting.retention-days:30}")
     private int retentionDays;
 
-    /** 分片时长（秒）。 */
+    /** 分片时长（秒），协议范围 5–30（受 P4 16MiB PSRAM 约束）。 */
     @Value("${meeting.chunk-sec:30}")
     private int chunkSec;
 
-    /** 超过该分钟数没有新分片 → 自动结束会议（设备丢失/断电兜底）。 */
+    /** 会议录音总开关；关闭时设备 start 返回 E_MEETING_FEATURE_DISABLED。 */
+    @Value("${meeting.enabled:true}")
+    private boolean enabled;
+
+    /** 首个支持会议录音的固件版本；留空表示只校验非空、不做版本比较。 */
+    @Value("${meeting.min-fw-version:}")
+    private String minFwVersion;
+
+    /** 超时未结束的会议自动 finalize（设备丢失/断电兜底）。 */
     @Value("${meeting.finalize-after-minutes:10}")
     private int finalizeAfterMinutes;
 

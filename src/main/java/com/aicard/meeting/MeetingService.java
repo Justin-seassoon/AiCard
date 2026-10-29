@@ -57,10 +57,19 @@ public class MeetingService {
 
     public record ActionEdit(Long id, String task, String owner, String dueDate, String status, String sourceRef) {}
 
+    /** 设备 start 上报的固件 / 能力 / 触发 / 合规留痕。后台 WAV 导入传 null。 */
+    public record DeviceMeta(String fwVersion, List<String> features, String trigger,
+                             Boolean noticePlayed, String noticeVersion) {}
+
     // ===================== 设备侧 =====================
 
     public Meeting start(Device device, String clientKey, Instant startedAt, String codec,
                          Integer sampleRate, Integer chunkSec, String title) {
+        return start(device, clientKey, startedAt, codec, sampleRate, chunkSec, title, null);
+    }
+
+    public Meeting start(Device device, String clientKey, Instant startedAt, String codec,
+                         Integer sampleRate, Integer chunkSec, String title, DeviceMeta meta) {
         String key = blankToNull(clientKey);
         if (key != null) {
             Optional<Meeting> existing = meetings.findByDeviceIdAndClientKey(device.getDeviceId(), key);
@@ -81,9 +90,14 @@ public class MeetingService {
                 .deviceId(device.getDeviceId())
                 .staffName(device.getStaffName())
                 .title(blankToNull(title))
+                .fwVersion(meta == null ? null : blankToNull(meta.fwVersion()))
+                .features(meta == null || meta.features() == null ? null : writeJson(meta.features()))
+                .triggerType(meta == null ? null : blankToNull(meta.trigger()))
+                .noticePlayed(meta == null ? null : meta.noticePlayed())
+                .noticeVersion(meta == null ? null : blankToNull(meta.noticeVersion()))
                 .status(Meeting.STATUS_RECORDING)
                 .startedAt(begin)
-                .chunkSec(chunkSec == null ? config.getChunkSec() : clamp(chunkSec, 5, 120))
+                .chunkSec(chunkSec == null ? config.getChunkSec() : clamp(chunkSec, 5, 30))
                 .codec(normalizeCodec(codec))
                 .sampleRate(sampleRate == null ? 16000 : sampleRate)
                 .audioExpiresAt(begin.plus(config.getRetentionDays(), ChronoUnit.DAYS))
@@ -118,39 +132,54 @@ public class MeetingService {
         Meeting meeting = start(device, null, Instant.now(), "pcm16", 16000, config.getChunkSec(), title);
         int chunkBytes = meeting.getChunkSec() * 16000 * 2;
         int seq = 0;
-        for (int off = 0; off < pcm16.length; off += chunkBytes) {
-            int len = Math.min(chunkBytes, pcm16.length - off);
-            uploadChunkInternal(meeting, seq++, java.util.Arrays.copyOfRange(pcm16, off, off + len), null);
+        try {
+            for (int off = 0; off < pcm16.length; off += chunkBytes) {
+                int len = Math.min(chunkBytes, pcm16.length - off);
+                uploadChunkInternal(meeting, seq++, java.util.Arrays.copyOfRange(pcm16, off, off + len), null);
+            }
+            return endInternal(meeting, seq - 1);
+        } catch (MeetingException e) {
+            // 后台导入沿用 Spring 默认错误格式，不暴露设备错误信封
+            throw new ResponseStatusException(e.getStatus(), e.getMessage(), e);
         }
-        return endInternal(meeting, seq - 1);
     }
 
     private void uploadChunkInternal(Meeting meeting, int seq, byte[] data, String shaHeader) {
         String meetingId = meeting.getMeetingId();
+        if (meeting.getAudioDeletedAt() != null) {
+            throw new MeetingException(HttpStatus.GONE, "E_MEETING_EXPIRED", "audio expired", false);
+        }
         if (seq < 0 || seq > MAX_SEQ) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid seq");
+            throw MeetingException.invalid("invalid seq");
         }
         if (data == null || data.length == 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "empty audio chunk");
+            throw MeetingException.invalid("empty audio chunk");
         }
         if (data.length > config.getMaxChunkBytes()) {
-            throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "audio chunk too large");
+            throw new MeetingException(HttpStatus.PAYLOAD_TOO_LARGE, "E_MEETING_TOO_LARGE",
+                    "audio chunk too large", false);
         }
         if (!Meeting.STATUS_RECORDING.equals(meeting.getStatus())
                 && !Meeting.STATUS_UPLOADING.equals(meeting.getStatus())) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "meeting is not accepting chunks");
+            throw MeetingException.state("meeting is not accepting chunks");
+        }
+        if (meeting.getExpectedLastSeq() != null && seq > meeting.getExpectedLastSeq()) {
+            throw MeetingException.state("seq exceeds expected_last_seq");
         }
         String sha = sha256(data);
         if (shaHeader != null && !shaHeader.isBlank() && !shaHeader.equalsIgnoreCase(sha)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sha256 mismatch");
+            throw new MeetingException(HttpStatus.BAD_REQUEST, "E_MEETING_SHA_MISMATCH",
+                    "sha256 mismatch", true);
         }
         Optional<MeetingChunk> existing = chunks.findByMeetingIdAndSeq(meetingId, seq);
         if (existing.isPresent()) {
             MeetingChunk c = existing.get();
             if (!c.getSizeBytes().equals((long) data.length)
                     || (c.getSha256() != null && !c.getSha256().equalsIgnoreCase(sha))) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "chunk already exists with different content");
+                throw new MeetingException(HttpStatus.CONFLICT, "E_MEETING_SEQ_CONFLICT",
+                        "chunk already exists with different content", false);
             }
+            afterChunkStored(meeting);
             return; // 幂等
         }
 
@@ -166,6 +195,7 @@ public class MeetingService {
                     .build());
         } catch (org.springframework.dao.DataIntegrityViolationException duplicate) {
             // 并发重复上传：唯一键兜底，按幂等处理
+            afterChunkStored(meeting);
             return;
         }
         if (meeting.getLastSeq() == null || seq > meeting.getLastSeq()) {
@@ -173,31 +203,97 @@ public class MeetingService {
         }
         meeting.setStatus(Meeting.STATUS_UPLOADING);
         meeting.setUpdatedAt(Instant.now());
-        meetings.save(meeting);
+        afterChunkStored(meeting);
+    }
+
+    /** 分片落库后：已声明 last_seq 时重算缺片，补齐则直接转写（设备无需再次 end 也能自动收尾）。 */
+    private void afterChunkStored(Meeting meeting) {
+        if (meeting.getExpectedLastSeq() == null) {
+            meetings.save(meeting);
+            return;
+        }
+        List<Integer> missing = missingSeqs(meeting.getMeetingId(), meeting.getExpectedLastSeq());
+        meeting.setMissingSeqs(writeJson(missing));
+        meeting.setUpdatedAt(Instant.now());
+        if (!missing.isEmpty()) {
+            meeting.setStatus(Meeting.STATUS_UPLOADING);
+            meetings.save(meeting);
+            return;
+        }
+        meeting.setStatus(Meeting.STATUS_TRANSCRIBING);
+        meeting.setErrorMessage(null);
+        Meeting saved = meetings.save(meeting);
+        processor.process(saved.getId());
     }
 
     public Meeting end(Device device, String meetingId, Integer lastSeq) {
+        if (lastSeq == null) {
+            throw MeetingException.invalid("last_seq is required");
+        }
         Meeting meeting = requireDeviceMeeting(device, meetingId);
         return endInternal(meeting, lastSeq);
     }
 
-    /** 结束并触发异步处理；重复调用幂等（已在处理/已完成的会议原样返回）。 */
+    /**
+     * 结束并核对完整性：无缺片 → 转写；有缺片 → 保持 uploading，等待设备补片（10 分钟无新片自动收尾）。
+     * 重复调用幂等；已在处理/已完成的会议原样返回。
+     */
     public Meeting endInternal(Meeting meeting, Integer lastSeq) {
-        if (Meeting.STATUS_DRAFT.equals(meeting.getStatus())
-                || Meeting.STATUS_REVIEWED.equals(meeting.getStatus())
-                || Meeting.STATUS_DRAFTING.equals(meeting.getStatus())
-                || Meeting.STATUS_TRANSCRIBING.equals(meeting.getStatus())) {
+        if (isProcessingOrDone(meeting.getStatus())) {
             return meeting;
         }
-        int expected = lastSeq != null ? lastSeq
-                : (meeting.getLastSeq() == null ? -1 : meeting.getLastSeq());
-        if (expected < -1 || expected > MAX_SEQ) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid last_seq");
+        if (lastSeq != null && (lastSeq < -1 || lastSeq > MAX_SEQ)) {
+            throw MeetingException.invalid("invalid last_seq");
         }
+        int expected = resolveExpected(meeting, lastSeq);
+        applyEnd(meeting, expected);
+        List<Integer> missing = missingSeqs(meeting.getMeetingId(), expected);
+        meeting.setMissingSeqs(writeJson(missing));
+        if (missing.isEmpty()) {
+            return transcribe(meeting);
+        }
+        meeting.setStatus(Meeting.STATUS_UPLOADING);
+        meeting.setUpdatedAt(Instant.now());
+        return meetings.save(meeting);
+    }
+
+    public Meeting statusForDevice(Device device, String meetingId) {
+        return requireDeviceMeeting(device, meetingId);
+    }
+
+    public long uploadedCount(String meetingId) {
+        return chunks.countByMeetingId(meetingId);
+    }
+
+    private static boolean isProcessingOrDone(String status) {
+        return Meeting.STATUS_DRAFT.equals(status)
+                || Meeting.STATUS_REVIEWED.equals(status)
+                || Meeting.STATUS_DRAFTING.equals(status)
+                || Meeting.STATUS_TRANSCRIBING.equals(status);
+    }
+
+    /** expected_last_seq 取「已记录值 / 已收到最大 seq / 本次 last_seq」三者最大，不允许减小。 */
+    private static int resolveExpected(Meeting meeting, Integer lastSeq) {
+        int expected = -1;
+        if (meeting.getExpectedLastSeq() != null) {
+            expected = meeting.getExpectedLastSeq();
+        }
+        if (meeting.getLastSeq() != null) {
+            expected = Math.max(expected, meeting.getLastSeq());
+        }
+        if (lastSeq != null) {
+            expected = Math.max(expected, lastSeq);
+        }
+        return expected;
+    }
+
+    private static void applyEnd(Meeting meeting, int expected) {
         meeting.setExpectedLastSeq(expected);
         meeting.setEndedAt(meeting.getEndedAt() == null ? Instant.now() : meeting.getEndedAt());
         meeting.setDurationSec(Math.max(0, expected + 1) * meeting.getChunkSec());
-        meeting.setMissingSeqs(writeJson(missingSeqs(meeting.getMeetingId(), expected)));
+    }
+
+    private Meeting transcribe(Meeting meeting) {
         meeting.setStatus(Meeting.STATUS_TRANSCRIBING);
         meeting.setErrorMessage(null);
         meeting.setUpdatedAt(Instant.now());
@@ -354,7 +450,12 @@ public class MeetingService {
         int count = 0;
         for (Meeting m : stale) {
             try {
-                endInternal(m, m.getLastSeq());
+                // 超时收尾按已声明的 expected_last_seq 收尾，保留缺片记录；未声明则按已收到最大 seq
+                int expected = m.getExpectedLastSeq() != null ? m.getExpectedLastSeq()
+                        : (m.getLastSeq() == null ? -1 : m.getLastSeq());
+                applyEnd(m, expected);
+                m.setMissingSeqs(writeJson(missingSeqs(m.getMeetingId(), expected)));
+                transcribe(m);
                 count++;
             } catch (Exception ignored) {
                 // 单条失败不影响其它会议
@@ -385,9 +486,9 @@ public class MeetingService {
 
     private Meeting requireDeviceMeeting(Device device, String meetingId) {
         Meeting meeting = meetings.findByMeetingId(meetingId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "meeting not found"));
+                .orElseThrow(MeetingException::notFound);
         if (!meeting.getDeviceId().equals(device.getDeviceId())) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "meeting not found");
+            throw MeetingException.notFound();
         }
         return meeting;
     }

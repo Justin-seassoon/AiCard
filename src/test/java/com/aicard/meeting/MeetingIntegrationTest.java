@@ -79,7 +79,7 @@ class MeetingIntegrationTest {
     }
 
     @Test
-    void missingChunksAreRecordedAndExpiredAudioIsDeleted() throws Exception {
+    void missingChunksKeepUploadingThenResumeOnFill() throws Exception {
         Device device = devices.findByDeviceId("demo-device-001").orElseThrow();
         Meeting m = meetings.start(device, "it-missing-" + System.nanoTime(), Instant.now(),
                 "pcm16", 16000, 30, null);
@@ -87,6 +87,14 @@ class MeetingIntegrationTest {
         meetings.uploadChunk(device, m.getMeetingId(), 2, new byte[3200], null);
 
         meetings.end(device, m.getMeetingId(), 3);
+        Meeting waiting = meetingRepo.findByMeetingId(m.getMeetingId()).orElseThrow();
+        assertThat(waiting.getStatus()).isEqualTo(Meeting.STATUS_UPLOADING);
+        assertThat(waiting.getExpectedLastSeq()).isEqualTo(3);
+        assertThat(meetings.missingList(waiting)).containsExactly(1, 3);
+
+        // 补片后自动转写（无需再次 end）
+        meetings.uploadChunk(device, m.getMeetingId(), 1, new byte[3200], null);
+        meetings.uploadChunk(device, m.getMeetingId(), 3, new byte[3200], null);
         Meeting done = await(m.getMeetingId());
 
         assertThat(done.getStatus()).isEqualTo(Meeting.STATUS_DRAFT);
@@ -104,6 +112,28 @@ class MeetingIntegrationTest {
         assertThatThrownBy(() -> meetings.audio(after))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("audio already deleted");
+    }
+
+    @Test
+    void staleUploadingMeetingFinalizesWithDeclaredExpected() throws Exception {
+        Device device = devices.findByDeviceId("demo-device-001").orElseThrow();
+        Meeting m = meetings.start(device, "it-stale-" + System.nanoTime(), Instant.now(),
+                "pcm16", 16000, 30, null);
+        meetings.uploadChunk(device, m.getMeetingId(), 0, new byte[3200], null);
+        meetings.end(device, m.getMeetingId(), 2);
+
+        assertThat(meetingRepo.findByMeetingId(m.getMeetingId()).orElseThrow().getStatus())
+                .isEqualTo(Meeting.STATUS_UPLOADING);
+
+        // 回拨 updated_at，模拟 10 分钟无新分片
+        jdbc.update("UPDATE meeting SET updated_at = now() - interval '11 minutes' WHERE meeting_id = ?",
+                m.getMeetingId());
+        assertThat(meetings.finalizeStale()).isGreaterThanOrEqualTo(1);
+
+        Meeting done = await(m.getMeetingId());
+        assertThat(done.getStatus()).isEqualTo(Meeting.STATUS_DRAFT);
+        assertThat(done.getExpectedLastSeq()).isEqualTo(2);
+        assertThat(meetings.missingList(done)).containsExactly(1, 2);
     }
 
     @Test

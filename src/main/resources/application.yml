@@ -57,14 +57,20 @@ ota:
   url-expires-sec: 3600
   public-base-url: ${OTA_PUBLIC_BASE_URL:}
 meeting:
+  # 会议录音总开关；关闭时设备 start 返回 E_MEETING_FEATURE_DISABLED
+  enabled: ${MEETING_ENABLED:true}
+  # 首个支持会议录音的固件版本；留空只校验 fw_version 非空，不比较版本
+  min-fw-version: ${MEETING_MIN_FW_VERSION:}
   # 音频共享卷：多容器部署必须挂同一卷，否则后台读不到网关写入的分片
   storage-dir: ${MEETING_STORAGE_DIR:/data/meetings}
   retention-days: ${MEETING_RETENTION_DAYS:30}
+  # 分片时长（秒）：协议范围 5–30；受 P4 16MiB PSRAM 约束，60/120 不支持
   chunk-sec: 30
   finalize-after-minutes: 10
   finalize-scan-ms: 300000
   cleanup-cron: "0 20 3 * * *"
   language: ja-JP
+  # 单片传输上限 2MB（30 秒 PCM16 约 960KB；不是内存预算）
   max-chunk-bytes: 2097152
 management:
   endpoints:

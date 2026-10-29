@@ -54,6 +54,23 @@ public class Meeting {
     @Column(name = "title", length = 255)
     private String title;
 
+    /** 设备 start 上报：固件版本 / 能力列表 / 触发方式 / 现场提示留痕。 */
+    @Column(name = "fw_version", length = 32)
+    private String fwVersion;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "features", columnDefinition = "jsonb")
+    private String features;
+
+    @Column(name = "trigger_type", length = 32)
+    private String triggerType;
+
+    @Column(name = "notice_played")
+    private Boolean noticePlayed;
+
+    @Column(name = "notice_version", length = 32)
+    private String noticeVersion;
+
     @Column(name = "status", nullable = false, length = 24)
     private String status;
 

@@ -4,7 +4,6 @@ import com.aicard.common.domain.Device;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -16,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 class MeetingServiceTest {
@@ -49,19 +49,29 @@ class MeetingServiceTest {
     @Test
     void startCreatesRecordingAndIsIdempotentByClientKey() {
         Device device = device();
-        Meeting m = service.start(device, "key-1", Instant.parse("2026-10-23T01:00:00Z"),
-                "pcm16", 16000, 30, "定例会議");
+        Instant startedAt = Instant.now().minus(1, ChronoUnit.HOURS);
+        Meeting m = service.start(device, "key-1", startedAt, "pcm16", 16000, 30, "定例会議");
 
         assertThat(m.getMeetingId()).startsWith("mtg-");
         assertThat(m.getStatus()).isEqualTo(Meeting.STATUS_RECORDING);
         assertThat(m.getCustomerId()).isEqualTo(7L);
         assertThat(m.getStoreId()).isEqualTo(8L);
         assertThat(m.getStaffName()).isEqualTo("田中");
-        assertThat(m.getAudioExpiresAt()).isEqualTo(Instant.parse("2026-11-22T01:00:00Z"));
+        assertThat(m.getAudioExpiresAt()).isEqualTo(startedAt.plus(30, ChronoUnit.DAYS));
 
         when(meetings.findByDeviceIdAndClientKey("dev-1", "key-1")).thenReturn(Optional.of(m));
         Meeting again = service.start(device, "key-1", null, null, null, null, null);
         assertThat(again.getMeetingId()).isEqualTo(m.getMeetingId());
+    }
+
+    @Test
+    void startClampsChunkSecToProtocolRange() {
+        Device device = device();
+        Meeting high = service.start(device, "key-60", Instant.now(), "pcm16", 16000, 60, "定例会議");
+        Meeting low = service.start(device, "key-1", Instant.now(), "pcm16", 16000, 1, "定例会議");
+
+        assertThat(high.getChunkSec()).isEqualTo(30);
+        assertThat(low.getChunkSec()).isEqualTo(5);
     }
 
     @Test
@@ -91,12 +101,14 @@ class MeetingServiceTest {
         Device device = device();
         when(meetings.findByMeetingId("mtg-1")).thenReturn(Optional.of(meeting()));
         assertThatThrownBy(() -> service.uploadChunk(device, "mtg-1", 0, new byte[]{1}, "deadbeef"))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("sha256 mismatch");
+                .isInstanceOf(MeetingException.class)
+                .hasMessageContaining("sha256 mismatch")
+                .extracting(e -> ((MeetingException) e).getErrorCode())
+                .isEqualTo("E_MEETING_SHA_MISMATCH");
     }
 
     @Test
-    void endComputesMissingSeqsAndTriggersProcessing() {
+    void endWithMissingSeqsKeepsUploadingAndDoesNotProcess() {
         Device device = device();
         Meeting m = meeting();
         when(meetings.findByMeetingId("mtg-1")).thenReturn(Optional.of(m));
@@ -106,8 +118,84 @@ class MeetingServiceTest {
 
         service.end(device, "mtg-1", 3);
 
-        assertThat(m.getStatus()).isEqualTo(Meeting.STATUS_TRANSCRIBING);
+        assertThat(m.getStatus()).isEqualTo(Meeting.STATUS_UPLOADING);
+        assertThat(m.getExpectedLastSeq()).isEqualTo(3);
         assertThat(m.getDurationSec()).isEqualTo(120);
+        assertThat(service.missingList(m)).containsExactly(1, 3);
+        verify(processor, never()).process(any());
+    }
+
+    @Test
+    void uploadingMissingChunksAutoTranscribesWhenComplete() {
+        Device device = device();
+        Meeting m = meeting();
+        m.setStatus(Meeting.STATUS_UPLOADING);
+        m.setExpectedLastSeq(3);
+        m.setLastSeq(2);
+        m.setMissingSeqs("[1,3]");
+        when(meetings.findByMeetingId("mtg-1")).thenReturn(Optional.of(m));
+        when(chunks.findByMeetingIdOrderBySeqAsc("mtg-1"))
+                .thenReturn(List.of(chunk(0), chunk(1), chunk(2)))
+                .thenReturn(List.of(chunk(0), chunk(1), chunk(2), chunk(3)));
+        when(chunks.findByMeetingIdAndSeq(eq("mtg-1"), anyInt())).thenReturn(Optional.empty());
+        when(audioStore.write(any(), anyString(), anyInt(), anyString(), any())).thenReturn("7/mtg-1/x.pcm");
+
+        service.uploadChunk(device, "mtg-1", 1, new byte[]{1}, null);
+        assertThat(m.getStatus()).isEqualTo(Meeting.STATUS_UPLOADING);
+        assertThat(service.missingList(m)).containsExactly(3);
+        verify(processor, never()).process(any());
+
+        service.uploadChunk(device, "mtg-1", 3, new byte[]{1}, null);
+        assertThat(m.getStatus()).isEqualTo(Meeting.STATUS_TRANSCRIBING);
+        assertThat(service.missingList(m)).isEmpty();
+        verify(processor, times(1)).process(m.getId());
+    }
+
+    @Test
+    void uploadChunkRejectsSeqBeyondExpectedLastSeq() {
+        Device device = device();
+        Meeting m = meeting();
+        m.setStatus(Meeting.STATUS_UPLOADING);
+        m.setExpectedLastSeq(3);
+        when(meetings.findByMeetingId("mtg-1")).thenReturn(Optional.of(m));
+
+        assertThatThrownBy(() -> service.uploadChunk(device, "mtg-1", 4, new byte[]{1}, null))
+                .isInstanceOf(MeetingException.class)
+                .extracting(e -> ((MeetingException) e).getErrorCode())
+                .isEqualTo("E_MEETING_STATE");
+    }
+
+    @Test
+    void repeatedEndNeverShrinksExpectedLastSeq() {
+        Device device = device();
+        Meeting m = meeting();
+        m.setStatus(Meeting.STATUS_UPLOADING);
+        m.setExpectedLastSeq(5);
+        m.setLastSeq(4);
+        when(meetings.findByMeetingId("mtg-1")).thenReturn(Optional.of(m));
+        when(chunks.findByMeetingIdOrderBySeqAsc("mtg-1")).thenReturn(List.of(
+                chunk(0), chunk(1), chunk(2), chunk(3), chunk(4)));
+
+        service.end(device, "mtg-1", 2);
+
+        assertThat(m.getExpectedLastSeq()).isEqualTo(5);
+        assertThat(service.missingList(m)).containsExactly(5);
+        assertThat(m.getStatus()).isEqualTo(Meeting.STATUS_UPLOADING);
+    }
+
+    @Test
+    void finalizeStaleUsesDeclaredExpectedLastSeq() {
+        Meeting m = meeting();
+        m.setStatus(Meeting.STATUS_UPLOADING);
+        m.setExpectedLastSeq(3);
+        m.setLastSeq(2);
+        when(meetings.findByStatusInAndUpdatedAtBefore(any(), any())).thenReturn(List.of(m));
+        when(chunks.findByMeetingIdOrderBySeqAsc("mtg-1")).thenReturn(List.of(chunk(0), chunk(2)));
+
+        assertThat(service.finalizeStale()).isEqualTo(1);
+
+        assertThat(m.getStatus()).isEqualTo(Meeting.STATUS_TRANSCRIBING);
+        assertThat(m.getExpectedLastSeq()).isEqualTo(3);
         assertThat(service.missingList(m)).containsExactly(1, 3);
         verify(processor).process(m.getId());
     }
@@ -119,8 +207,13 @@ class MeetingServiceTest {
         m.setDeviceId("other-device");
         when(meetings.findByMeetingId("mtg-1")).thenReturn(Optional.of(m));
         assertThatThrownBy(() -> service.uploadChunk(device, "mtg-1", 0, new byte[]{1}, null))
-                .isInstanceOf(ResponseStatusException.class)
-                .hasMessageContaining("meeting not found");
+                .isInstanceOf(MeetingException.class)
+                .extracting(e -> ((MeetingException) e).getErrorCode())
+                .isEqualTo("E_MEETING_NOT_FOUND");
+    }
+
+    private static MeetingChunk chunk(int seq) {
+        return MeetingChunk.builder().meetingId("mtg-1").seq(seq).build();
     }
 
     private static Device device() {

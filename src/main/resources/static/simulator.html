@@ -454,12 +454,14 @@
     var token = $('token').value.trim();
     if (!deviceId || !token) { log('会议录音需要 device_id / token', 'err'); return; }
     ensureAudio().then(function () {
-      fetch('/api/meetings/start', {
+      fetch('/api/v1/meetings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId, 'X-Device-Token': token },
+        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId, 'Authorization': 'Bearer ' + token },
         body: JSON.stringify({
           client_key: uuid(), codec: 'pcm16', sample_rate: 16000, chunk_sec: 30,
-          title: '会議 ' + new Date().toLocaleString('ja-JP')
+          title: '会議 ' + new Date().toLocaleString('ja-JP'),
+          fw_version: 'sim-1.0', features: ['meeting_recording'],
+          trigger: 'long_press', notice_played: true, notice_version: 'sim-v1'
         })
       }).then(function (r) {
         if (!r.ok) return r.text().then(function (t) { throw new Error('HTTP ' + r.status + ' ' + t); });
@@ -495,16 +497,19 @@
     waitMeetingUploads(function () {
       var deviceId = $('deviceId').value.trim();
       var token = $('token').value.trim();
-      fetch('/api/meetings/' + encodeURIComponent(meetingId) + '/end', {
+      fetch('/api/v1/meetings/' + encodeURIComponent(meetingId) + '/end', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId, 'X-Device-Token': token },
+        headers: { 'Content-Type': 'application/json', 'X-Device-Id': deviceId, 'Authorization': 'Bearer ' + token },
         body: JSON.stringify({ last_seq: meetingSeq - 1 })
       }).then(function (r) {
         if (!r.ok) return r.text().then(function (t) { throw new Error('HTTP ' + r.status + ' ' + t); });
         return r.json();
       }).then(function (e) {
-        $('meeting-status').textContent = '已结束 · 处理中（后台查看）';
-        log('会议结束 missing=' + e.missing_count + ' status=' + e.status, 'sys');
+        var missing = e.missing_seqs || [];
+        $('meeting-status').textContent = missing.length
+          ? '已结束 · 缺 ' + missing.length + ' 片，等待补传'
+          : '已结束 · 处理中（后台查看）';
+        log('会议结束 missing=' + JSON.stringify(missing) + ' status=' + e.status, 'sys');
       }).catch(function (err) {
         $('meeting-status').textContent = '结束失败';
         log('会议结束失败：' + err.message, 'err');
@@ -523,12 +528,12 @@
     if (meetingUploading || !meetingQueue.length || !meetingId) return;
     var item = meetingQueue[0];
     meetingUploading = true;
-    fetch('/api/meetings/' + encodeURIComponent(meetingId) + '/chunks/' + item.seq, {
+    fetch('/api/v1/meetings/' + encodeURIComponent(meetingId) + '/chunks/' + item.seq, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/octet-stream',
         'X-Device-Id': $('deviceId').value.trim(),
-        'X-Device-Token': $('token').value.trim()
+        'Authorization': 'Bearer ' + $('token').value.trim()
       },
       body: item.bytes
     }).then(function (r) {
