@@ -72,6 +72,16 @@ meeting:
   language: ja-JP
   # 单片传输上限 2MB（30 秒 PCM16 约 960KB；不是内存预算）
   max-chunk-bytes: 2097152
+device-log:
+  # 通用设备诊断日志（不限会议场景）
+  enabled: ${DEVICE_LOG_ENABLED:true}
+  # 日志共享卷：多容器部署必须挂同一卷
+  storage-dir: ${DEVICE_LOG_STORAGE_DIR:/data/device-logs}
+  retention-days: ${DEVICE_LOG_RETENTION_DAYS:7}
+  max-bytes: ${DEVICE_LOG_MAX_BYTES:262144}
+  max-raw-bytes: ${DEVICE_LOG_MAX_RAW_BYTES:1048576}
+  rate-limit-seconds: ${DEVICE_LOG_RATE_LIMIT_SECONDS:60}
+  cleanup-cron: "0 40 3 * * *"
 management:
   endpoints:
     web:
