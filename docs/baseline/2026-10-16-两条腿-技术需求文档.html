@@ -143,7 +143,7 @@
 ║   ┌── 腿A ────────────┐  ┌── 共享云端核心 ──────────┐  ┌── 腿B ──────────┐ ║
 ║   │ 翻译链路 ✅        │  │ 知识库 SKB/VKB ✅         │  │ ① 自生长知识 ✅ │ ║
 ║   │ LID / 质量门控 ✅  │  │ 广播 ✅  通知 ✅          │  │ ③ 文档处理   ✅ │ ║
-║   │ 供应商路由 ✅      │  │ 报表 🟡  维护/点检 ✅     │  │ ② agent 执行 ✅ │ ║
+║   │ 供应商路由 ✅      │  │ 报表 🟡  维护/点检 🟡     │  │ ② agent 执行 ✅ │ ║
 ║   │                   │  │ OTA ✅   采集 ✅          │  │ 会议纪要 🟡     │ ║
 ║   └───────────────────┘  └──────────────────────────┘  └─────────────────┘ ║
 ╠══════════════════════════════════════════════════════════════════════════╣
@@ -178,7 +178,7 @@
           <tr><td>广播</td><td>分组多语言 + 回执 + 离线补拉</td><td>已实现（<code>broadcast/</code>）</td><td><span class="st done">✅</span></td><td>—</td></tr>
           <tr><td>运营通知</td><td>定时/群发，多语言翻译 + TTS</td><td>已实现（<code>notification/</code>）</td><td><span class="st done">✅</span></td><td>—</td></tr>
           <tr><td>报表</td><td>周报/月报聚合</td><td>已实现但<b>按设备</b>（<code>report/</code>）</td><td><span class="st part">🟡</span></td><td><b>聚合维度需泛化到「按租户/用户」</b>（C4，卡 ③）</td></tr>
-          <tr><td>维护/点检</td><td>维修单 + 点检任务/记录</td><td>已实现（<code>maintenance/</code>）</td><td><span class="st done">✅</span></td><td>—</td></tr>
+          <tr><td>维护/点检</td><td>维修单 + 点检任务/记录</td><td><b>后台侧已实现</b>；现场上报、任务下发、异常转维修未打通</td><td><span class="st part">🟡</span></td><td>硬件到位后统一闭环（见 <code>baseline/开发欠账清单.md</code>）</td></tr>
           <tr><td>OTA</td><td>固件发布/包管理</td><td>已实现（<code>ota/</code>）</td><td><span class="st done">✅</span></td><td>—</td></tr>
           <tr><td>采集</td><td>翻译/问答旁路脱敏落库</td><td>已实现（<code>ingestion/</code>）</td><td><span class="st done">✅</span></td><td>—</td></tr>
           <tr><td>后台管理</td><td>设备/文档 REST + RBAC</td><td>有接口，<b>无真实鉴权/用户</b></td><td><span class="st part">🟡</span></td><td>C1 <span class="star">★</span> / C2 <span class="star">★</span></td></tr>
@@ -193,7 +193,8 @@
       <table>
         <thead><tr><th>需求</th><th>现状</th><th>状态</th></tr></thead>
         <tbody>
-          <tr><td>设备接入 / 翻译 / 知识 / 广播 / 通知 / 维护 / OTA</td><td>全链路已实现</td><td><span class="st done">✅</span></td></tr>
+          <tr><td>设备接入 / 翻译 / 知识 / 广播 / 通知 / OTA</td><td>全链路已实现</td><td><span class="st done">✅</span></td></tr>
+          <tr><td>维护 / 点检（后台侧）</td><td>后台登记与状态流转已实现；现场上报、任务下发、异常转维修待硬件</td><td><span class="st part">🟡</span></td></tr>
           <tr><td>端侧固件联调（样机）</td><td>进行中（硬件 10/20 交付）</td><td><span class="st part">🟡</span></td></tr>
           <tr><td>主动推送（在线触发 + 离线补拉）</td><td>通知/广播通道已具备</td><td><span class="st part">🟡</span></td></tr>
         </tbody>
@@ -223,7 +224,7 @@
       <table>
         <thead><tr><th>项</th><th>设计</th></tr></thead>
         <tbody>
-          <tr><td>设备接口</td><td><code>POST /api/meetings/start</code> → <code>meeting_id</code>；<code>PUT /api/meetings/{id}/chunks/{seq}</code>；<code>POST /api/meetings/{id}/end</code>；鉴权 <code>X-Device-Id</code> + <code>X-Device-Token</code></td></tr>
+          <tr><td>设备接口</td><td><code>POST /api/v1/meetings</code> → <code>meeting_id</code>；<code>PUT /api/v1/meetings/{id}/chunks/{seq}</code>；<code>POST /api/v1/meetings/{id}/end</code>；<code>GET /api/v1/meetings/{id}</code> 状态查询；鉴权 <code>Authorization: Bearer</code> + <code>X-Device-Id</code></td></tr>
           <tr><td>音频导入</td><td><code>POST /api/meetings/import</code>（multipart WAV，PCM16；自动下混/重采样到 16k mono）→ 同一套分片/转写/纪要；用于<b>无麦克风（HTTP 环境）</b>或会议系统/手机录音</td></tr>
           <tr><td>后台接口</td><td><code>GET /api/meetings</code>、<code>GET /{id}</code>、<code>PUT /{id}/minutes</code>、<code>POST /{id}/approve</code>、<code>POST /{id}/regenerate</code>、<code>GET /{id}/export.docx</code>、<code>GET /{id}/audio</code></td></tr>
           <tr><td>状态机</td><td><code>recording → uploading → transcribing → drafting → draft → reviewed</code>；异常 <code>failed</code>；缺片记录 <code>missing_seqs</code></td></tr>
@@ -274,7 +275,7 @@
           <tr><td><b>①</b></td><td>缺口捕获 → 聚合 → LLM 起草候选 → <b>人工审核</b> → 入库（<code>document.status: draft→published</code>）</td><td>本轮 demo 单租户，无需 C1/C2</td><td><span class="st done">✅</span></td></tr>
           <tr><td><b>③</b></td><td><code>docgen/</code> → 报表导出 xlsx + 社内文书 docx</td><td>C4（已落地）</td><td><span class="st done">✅</span></td></tr>
           <tr><td><b>②</b></td><td><code>agent/</code>（状态机 + 工具注册表 + plan/act/observe/reflect）</td><td>C5（已落地）</td><td><span class="st done">✅</span></td></tr>
-          <tr><td><b>会议纪要</b></td><td><code>meeting/</code>（分片上传 + 转写 + 结构化纪要 + 待办 + 审核/导出）</td><td>无（P0 不依赖真机/鉴权）</td><td><span class="st part">🟡 云端 P0 ✅ / 真机 P1 ⬜</span></td></tr>
+          <tr><td><b>会议纪要</b></td><td><code>meeting/</code>（分片上传 + 转写 + 结构化纪要 + 待办 + 审核/导出）</td><td>无（P0 不依赖真机/鉴权）</td><td><span class="st part">🟡 云端 P0 ✅ / 云端设备契约 P1-a ✅ / 真机 P1 ⬜</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -288,10 +289,11 @@
         <tbody>
           <tr><td>前端</td><td>腿 A 工牌 / 腿 B 后台</td><td><span class="st done">✅</span> / <span class="st todo">⬜</span></td></tr>
           <tr><td>接入</td><td>gateway / admin REST</td><td><span class="st done">✅</span> / <span class="st part">🟡</span></td></tr>
-          <tr><td>业务</td><td>翻译·知识·广播·通知·维护·OTA·采集</td><td><span class="st done">✅</span></td></tr>
+          <tr><td>业务</td><td>翻译·知识·广播·通知·OTA·采集</td><td><span class="st done">✅</span></td></tr>
+          <tr><td>业务</td><td>维护/点检（后台侧）</td><td><span class="st part">🟡</span></td></tr>
           <tr><td>业务</td><td>报表</td><td><span class="st part">🟡</span></td></tr>
           <tr><td>业务</td><td>①自生长知识 / ③文档 / ②agent</td><td><span class="st done">✅</span> <span class="st done">✅</span> <span class="st done">✅</span></td></tr>
-          <tr><td>业务</td><td>会议纪要（新增）</td><td><span class="st part">🟡 云端 P0 ✅ / 真机 P1 ⬜</span></td></tr>
+          <tr><td>业务</td><td>会议纪要（新增）</td><td><span class="st part">🟡 云端 P0 ✅ / 云端设备契约 P1-a ✅ / 真机 P1 ⬜</span></td></tr>
           <tr><td>抽象</td><td>Speech·LLM·Embedding Provider</td><td><span class="st done">✅</span></td></tr>
           <tr><td>数据</td><td>业务表 / 用户·候选·任务表</td><td><span class="st done">✅</span> / <span class="st todo">⬜</span></td></tr>
           <tr><td>横切</td><td>C1★ C2★ C3 C6</td><td><span class="st todo">⬜ ×4</span></td></tr>
