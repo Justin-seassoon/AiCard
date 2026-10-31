@@ -74,7 +74,7 @@ public class AzureSpeechProvider implements SpeechProvider {
         SpeechTranslationConfig config = SpeechTranslationConfig.fromSubscription(key, region);
         config.setSpeechRecognitionLanguage(toLocale(src));
         config.addTargetLanguage(tgt);
-        config.setVoiceName(voiceFor(tgt)); // speech-to-speech：翻译后合成 target 语音
+        applyVoice(config, tgt); // speech-to-speech：翻译后合成 target 语音
 
         PushAudioInputStream pushStream = AudioInputStream.createPushStream(
                 AudioStreamFormat.getWaveFormatPCM(SAMPLE_RATE, BITS_PER_SAMPLE, CHANNELS));
@@ -139,7 +139,7 @@ public class AzureSpeechProvider implements SpeechProvider {
     @Override
     public byte[] synthesize(String text, String language) {
         SpeechConfig config = SpeechConfig.fromSubscription(key, region);
-        config.setSpeechSynthesisVoiceName(voiceFor(language));
+        applyVoice(config, language);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (SpeechSynthesizer synthesizer = new SpeechSynthesizer(config, null)) {
             synthesizer.Synthesizing.addEventListener((o, e) -> {
@@ -221,7 +221,7 @@ public class AzureSpeechProvider implements SpeechProvider {
         SpeechTranslationConfig config = SpeechTranslationConfig.fromSubscription(key, region);
         config.setSpeechRecognitionLanguage(toLocale(src));
         config.addTargetLanguage(tgt);
-        config.setVoiceName(voiceFor(tgt));
+        applyVoice(config, tgt);
 
         PushAudioInputStream pushStream = AudioInputStream.createPushStream(
                 AudioStreamFormat.getWaveFormatPCM(SAMPLE_RATE, BITS_PER_SAMPLE, CHANNELS));
@@ -270,7 +270,7 @@ public class AzureSpeechProvider implements SpeechProvider {
     public TurnSession startTurnAuto(List<String> candidates, String tgt, Consumer<byte[]> onTtsAudioChunk) {
         SpeechTranslationConfig config = SpeechTranslationConfig.fromSubscription(key, region);
         config.addTargetLanguage(tgt);
-        config.setVoiceName(voiceFor(tgt));
+        applyVoice(config, tgt);
 
         AutoDetectSourceLanguageConfig autoDetect = AutoDetectSourceLanguageConfig.fromLanguages(candidates);
 
@@ -403,6 +403,16 @@ public class AzureSpeechProvider implements SpeechProvider {
         return config;
     }
 
+    /** 有明确音色用音色；没有则按语言让 Azure 选默认音色（避免非日语员工被日语音色朗读）。 */
+    private static void applyVoice(SpeechConfig config, String lang) {
+        String voice = voiceFor(lang);
+        if (voice != null) {
+            config.setSpeechSynthesisVoiceName(voice);
+        } else {
+            config.setSpeechSynthesisLanguage(toLocale(lang));
+        }
+    }
+
     private static String voiceFor(String lang) {
         if (lang == null) return "ja-JP-NanamiNeural";
         return switch (lang) {
@@ -410,7 +420,20 @@ public class AzureSpeechProvider implements SpeechProvider {
             case "ja-JP", "ja" -> "ja-JP-NanamiNeural";
             case "en-US", "en" -> "en-US-JennyNeural";
             case "ko-KR", "ko" -> "ko-KR-SunHiNeural";
-            default -> "ja-JP-NanamiNeural";
+            case "vi-VN", "vi" -> "vi-VN-HoaiMyNeural";
+            case "id-ID", "id" -> "id-ID-GadisNeural";
+            case "th-TH", "th" -> "th-TH-PremwadeeNeural";
+            case "ne-NP", "ne" -> "ne-NP-HemkalaNeural";
+            case "fil-PH", "fil", "tl" -> "fil-PH-BlessicaNeural";
+            case "my-MM", "my" -> "my-MM-NilarNeural";
+            case "km-KH", "km" -> "km-KH-SreymomNeural";
+            case "mn-MN", "mn" -> "mn-MN-YesuiNeural";
+            case "pt-BR", "pt" -> "pt-BR-FranciscaNeural";
+            case "es-ES", "es" -> "es-ES-ElviraNeural";
+            case "fr-FR", "fr" -> "fr-FR-DeniseNeural";
+            case "de-DE", "de" -> "de-DE-KatjaNeural";
+            case "ru-RU", "ru" -> "ru-RU-SvetlanaNeural";
+            default -> null;
         };
     }
 
