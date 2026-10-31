@@ -74,7 +74,7 @@ public class AzureSpeechProvider implements SpeechProvider {
         SpeechTranslationConfig config = SpeechTranslationConfig.fromSubscription(key, region);
         config.setSpeechRecognitionLanguage(toLocale(src));
         config.addTargetLanguage(tgt);
-        applyVoice(config, tgt); // speech-to-speech：翻译后合成 target 语音
+        applyTranslationVoice(config, tgt); // speech-to-speech：翻译后合成 target 语音
 
         PushAudioInputStream pushStream = AudioInputStream.createPushStream(
                 AudioStreamFormat.getWaveFormatPCM(SAMPLE_RATE, BITS_PER_SAMPLE, CHANNELS));
@@ -139,7 +139,7 @@ public class AzureSpeechProvider implements SpeechProvider {
     @Override
     public byte[] synthesize(String text, String language) {
         SpeechConfig config = SpeechConfig.fromSubscription(key, region);
-        applyVoice(config, language);
+        applySynthesisVoice(config, language);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try (SpeechSynthesizer synthesizer = new SpeechSynthesizer(config, null)) {
             synthesizer.Synthesizing.addEventListener((o, e) -> {
@@ -221,7 +221,7 @@ public class AzureSpeechProvider implements SpeechProvider {
         SpeechTranslationConfig config = SpeechTranslationConfig.fromSubscription(key, region);
         config.setSpeechRecognitionLanguage(toLocale(src));
         config.addTargetLanguage(tgt);
-        applyVoice(config, tgt);
+        applyTranslationVoice(config, tgt);
 
         PushAudioInputStream pushStream = AudioInputStream.createPushStream(
                 AudioStreamFormat.getWaveFormatPCM(SAMPLE_RATE, BITS_PER_SAMPLE, CHANNELS));
@@ -270,7 +270,7 @@ public class AzureSpeechProvider implements SpeechProvider {
     public TurnSession startTurnAuto(List<String> candidates, String tgt, Consumer<byte[]> onTtsAudioChunk) {
         SpeechTranslationConfig config = SpeechTranslationConfig.fromSubscription(key, region);
         config.addTargetLanguage(tgt);
-        applyVoice(config, tgt);
+        applyTranslationVoice(config, tgt);
 
         AutoDetectSourceLanguageConfig autoDetect = AutoDetectSourceLanguageConfig.fromLanguages(candidates);
 
@@ -403,8 +403,14 @@ public class AzureSpeechProvider implements SpeechProvider {
         return config;
     }
 
-    /** 有明确音色用音色；没有则按语言让 Azure 选默认音色（避免非日语员工被日语音色朗读）。 */
-    private static void applyVoice(SpeechConfig config, String lang) {
+    /** 翻译合成用 setVoiceName；SpeechTranslationConfig 不识别 setSpeechSynthesisVoiceName。 */
+    private static void applyTranslationVoice(SpeechTranslationConfig config, String lang) {
+        String voice = voiceFor(lang);
+        config.setVoiceName(voice != null ? voice : "ja-JP-NanamiNeural");
+    }
+
+    /** 独立 TTS：有明确音色用音色；没有则按语言让 Azure 选默认音色。 */
+    private static void applySynthesisVoice(SpeechConfig config, String lang) {
         String voice = voiceFor(lang);
         if (voice != null) {
             config.setSpeechSynthesisVoiceName(voice);
