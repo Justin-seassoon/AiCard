@@ -7,6 +7,8 @@ import com.aicard.translation.decision.DecisionInput;
 import com.aicard.translation.decision.DirectionDecision;
 import com.aicard.translation.decision.LidDecisionEngine;
 import com.aicard.translation.state.TranslationSessionState;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -16,6 +18,8 @@ import java.util.function.Consumer;
  * 见架构 spec §7.4 / §7.7。
  */
 public class TranslationOrchestrator {
+
+    private static final Logger log = LoggerFactory.getLogger(TranslationOrchestrator.class);
 
     private final SpeechProvider provider;
     private final LidDecisionEngine decision;
@@ -70,12 +74,16 @@ public class TranslationOrchestrator {
                 sourceSide, lid.lidLang(), lid.lidConfidence(), whitelistHit, staffLanguage,
                 state.visitorLanguage(), state.pending(), 0.8, 0.95));
 
+        log.info("auto decision: source={} lid={} conf={} visitor={} action={}",
+                sourceSide, lid.lidLang(), lid.lidConfidence(), state.visitorLanguage(), d.action());
+
         // 员工先说话、还没有 visitor_language 记忆时，按 lang_pair 反向兜底，避免 auto 模式完全无音频
         if ("repeat".equals(d.action()) && "wearer".equals(sourceSide)
                 && "UNKNOWN".equals(state.visitorLanguage())) {
             String[] pair = langPair == null ? new String[0] : langPair.split("-");
             if (pair.length >= 2) {
                 String visitor = toLocale(pair[0]);
+                log.info("auto wearer fallback to lang_pair: staff={} visitor={}", staffLanguage, visitor);
                 try {
                     provider.translateToSpeech(audio, staffLanguage, visitor, onTtsAudioChunk);
                     state.lock(visitor);
