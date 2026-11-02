@@ -78,6 +78,38 @@ class TranslationOrchestratorTest {
     }
 
     @Test
+    void autoUncertainStaffVoiceFallsBackToLangPair() {
+        provider.setLidResult(new LidResult("ja-JP", 0.9));
+        provider.setTranslatedText("你好");
+        provider.setTtsAudio(new byte[]{4});
+        List<byte[]> chunks = new ArrayList<>();
+
+        TranslationResult r = orchestrator.translateUtterance(
+                new byte[]{1}, "uncertain", "auto", "zh-ja", false, new TranslationSessionState(),
+                List.of("ja-JP", "zh-CN"), "ja-JP", chunks::add);
+
+        assertThat(r.action()).isEqualTo("translate");
+        assertThat(chunks).containsExactly(new byte[]{4});
+        assertThat(r.newVisitorLanguage()).isEqualTo("zh-CN");
+    }
+
+    @Test
+    void autoUncertainVisitorVoiceTranslatesByLid() {
+        provider.setLidResult(new LidResult("zh-CN", 0.9));
+        provider.setTranslatedText("こんにちは");
+        provider.setTtsAudio(new byte[]{6});
+        List<byte[]> chunks = new ArrayList<>();
+
+        TranslationResult r = orchestrator.translateUtterance(
+                new byte[]{1}, "uncertain", "auto", "zh-ja", false, new TranslationSessionState(),
+                List.of("ja-JP", "zh-CN"), "ja-JP", chunks::add);
+
+        assertThat(r.action()).isEqualTo("translate");
+        assertThat(chunks).containsExactly(new byte[]{6});
+        assertThat(r.newVisitorLanguage()).isEqualTo("zh-CN");
+    }
+
+    @Test
     void lowConfidenceReturnsRepeatWithoutTts() {
         provider.setLidResult(new LidResult("zh-CN", 0.3));
         List<byte[]> chunks = new ArrayList<>();

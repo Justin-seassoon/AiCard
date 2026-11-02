@@ -10,10 +10,21 @@ import com.aicard.translation.state.PendingSwitch;
 public class LidDecisionEngine {
 
     public DirectionDecision decide(DecisionInput in) {
-        if ("uncertain".equals(in.sourceSide())) {
-            return DirectionDecision.conflict();
+        if (in.sourceSide() == null || in.sourceSide().isBlank() || "uncertain".equals(in.sourceSide())) {
+            return decideUncertain(in);
         }
         if ("wearer".equals(in.sourceSide())) {
+            return decideWearer(in);
+        }
+        return decideCounterparty(in);
+    }
+
+    /**
+     * 说话方未知：不再直接 conflict，改用 LID 判向——与员工语言一致按员工处理，否则按游客处理。
+     * 端侧无法稳定判断近场/远场时，仍能出译文。
+     */
+    private DirectionDecision decideUncertain(DecisionInput in) {
+        if (in.lidLang() != null && in.lidLang().equals(in.staffLanguage())) {
             return decideWearer(in);
         }
         return decideCounterparty(in);

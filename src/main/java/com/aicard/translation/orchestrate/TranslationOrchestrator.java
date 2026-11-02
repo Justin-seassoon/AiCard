@@ -77,15 +77,21 @@ public class TranslationOrchestrator {
         log.info("auto decision: source={} lid={} conf={} visitor={} action={}",
                 sourceSide, lid.lidLang(), lid.lidConfidence(), state.visitorLanguage(), d.action());
 
-        // 员工先说话、还没有 visitor_language 记忆时，按 lang_pair 反向兜底，避免 auto 模式完全无音频
-        if ("repeat".equals(d.action()) && "wearer".equals(sourceSide)
+        // 员工先说话 / 说话方未知且还没有 visitor_language 记忆时，按 lang_pair 兜底，避免 auto 模式无音频
+        boolean sideUnknown = "wearer".equals(sourceSide) || "uncertain".equals(sourceSide)
+                || sourceSide == null || sourceSide.isBlank();
+        if ("repeat".equals(d.action()) && sideUnknown
                 && "UNKNOWN".equals(state.visitorLanguage())) {
             String[] pair = langPair == null ? new String[0] : langPair.split("-");
             if (pair.length >= 2) {
                 String visitor = toLocale(pair[0]);
-                log.info("auto wearer fallback to lang_pair: staff={} visitor={}", staffLanguage, visitor);
+                boolean staffSide = lid.lidLang() != null && lid.lidLang().equals(staffLanguage);
+                String src = staffSide ? staffLanguage : visitor;
+                String tgt = staffSide ? visitor : staffLanguage;
+                log.info("auto side-unknown fallback: source={} lid={} src={} tgt={}",
+                        sourceSide, lid.lidLang(), src, tgt);
                 try {
-                    provider.translateToSpeech(audio, staffLanguage, visitor, onTtsAudioChunk);
+                    provider.translateToSpeech(audio, src, tgt, onTtsAudioChunk);
                     state.lock(visitor);
                     return new TranslationResult("translate", null, visitor);
                 } catch (ProviderException e) {
