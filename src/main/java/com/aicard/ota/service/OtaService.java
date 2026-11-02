@@ -15,6 +15,8 @@ import com.aicard.ota.dto.OtaReleaseRequest;
 import com.aicard.ota.dto.OtaUpdate;
 import com.aicard.ota.repository.OtaPackageRepository;
 import com.aicard.ota.repository.OtaReleaseRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +36,7 @@ import java.util.Set;
 @Service
 public class OtaService {
 
+    private static final Logger log = LoggerFactory.getLogger(OtaService.class);
     private static final Set<String> MODULES = Set.of("p4", "c5");
     private static final Set<String> POLICIES = Set.of("optional", "mandatory");
 
@@ -143,10 +146,24 @@ public class OtaService {
 
         String curP4 = req.currentVersions() == null ? null : req.currentVersions().p4();
         String curC5 = req.currentVersions() == null ? null : req.currentVersions().c5();
-        boolean p4UpToDate = Objects.equals(curP4, release.getTargetP4Version());
-        boolean c5UpToDate = Objects.equals(curC5, release.getTargetC5Version());
+        int p4Cmp = VersionComparator.compare(curP4, release.getTargetP4Version());
+        int c5Cmp = VersionComparator.compare(curC5, release.getTargetC5Version());
+        boolean p4UpToDate = p4Cmp >= 0;
+        boolean c5UpToDate = c5Cmp >= 0;
         if (p4UpToDate && c5UpToDate) {
+            if (p4Cmp > 0 || c5Cmp > 0) {
+                log.info("ota device ahead of active release: device={} p4={} target={} c5={} target={}",
+                        req.deviceId(), curP4, release.getTargetP4Version(),
+                        curC5, release.getTargetC5Version());
+            }
             return new OtaCheckResponse(false, null, "UP_TO_DATE");
+        }
+        if (p4Cmp > 0 || c5Cmp > 0) {
+            // 有模块比当前发布更新，另一些落后：不能下发含降级的清单，等运维发布匹配版本
+            log.warn("ota device has module newer than active release, skip update: device={} p4={} target={} c5={} target={}",
+                    req.deviceId(), curP4, release.getTargetP4Version(),
+                    curC5, release.getTargetC5Version());
+            return new OtaCheckResponse(false, null, "NO_APPLICABLE_RELEASE");
         }
 
         List<OtaPackageDto> need = new ArrayList<>();

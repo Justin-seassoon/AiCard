@@ -83,6 +83,28 @@ class OtaServiceTest {
     }
 
     @Test
+    void newerDeviceIsNotDowngraded() {
+        when(authenticator.authenticate("d1", "tok")).thenReturn(device());
+        when(releases.findByStatus(OtaRelease.STATUS_ACTIVE)).thenReturn(Optional.of(release(1L, "3.3", "3.3")));
+
+        OtaCheckResponse resp = service.check(req("3.4", "3.3"), "tok");
+
+        assertThat(resp.updateAvailable()).isFalse();
+        assertThat(resp.reason()).isEqualTo("UP_TO_DATE");
+    }
+
+    @Test
+    void mixedNewerAndOlderSkipsUpdateToAvoidDowngrade() {
+        when(authenticator.authenticate("d1", "tok")).thenReturn(device());
+        when(releases.findByStatus(OtaRelease.STATUS_ACTIVE)).thenReturn(Optional.of(release(1L, "3.3", "2.0")));
+
+        OtaCheckResponse resp = service.check(req("3.4", "1.0"), "tok");
+
+        assertThat(resp.updateAvailable()).isFalse();
+        assertThat(resp.reason()).isEqualTo("NO_APPLICABLE_RELEASE");
+    }
+
+    @Test
     void returnsOnlyC5WhenP4UpToDate() {
         when(authenticator.authenticate("d1", "tok")).thenReturn(device());
         when(releases.findByStatus(OtaRelease.STATUS_ACTIVE)).thenReturn(Optional.of(release(1L, "2.0", "1.5")));

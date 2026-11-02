@@ -95,8 +95,7 @@ class SkbHandlerImplTest {
     @Test
     void answerTranslationFailureReturnsProviderError() {
         when(speech.transcribe(any(), eq("vi-VN"))).thenReturn("Bữa sáng mấy giờ?");
-        when(llm.translate("Bữa sáng mấy giờ?", "ja-JP")).thenReturn("朝食は何時ですか");
-        when(skb.answer("朝食は何時ですか", 7L, 8L, "skb"))
+        when(skb.answer("Bữa sáng mấy giờ?", 7L, 8L, "skb"))
                 .thenReturn(SkbResult.ok("朝食は7時からです", List.of()));
         when(llm.translate("朝食は7時からです", "vi-VN")).thenThrow(new ProviderException("llm down"));
 

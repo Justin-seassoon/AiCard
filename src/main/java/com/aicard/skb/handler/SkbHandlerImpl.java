@@ -59,6 +59,7 @@ public class SkbHandlerImpl implements SkbHandler {
 
     @Override
     public void onEndOfUtterance(SessionContext ctx, InboundMessage msg) {
+        long t0 = System.currentTimeMillis();
         String turnId = msg.turnId();
         byte[] audio = extract(turnId);
         String language = normalizeLanguage(ctx.staffLanguage());
@@ -70,8 +71,10 @@ public class SkbHandlerImpl implements SkbHandler {
             ctx.sendText(error(ctx, turnId, "E_ASR_FAIL", "请再说一遍"));
             return;
         }
+        long asrMs = System.currentTimeMillis() - t0;
 
-        // 知识库是日语：非日语员工的问题先翻译成日语再检索，保持检索/校验口径不变
+        // 知识库是日语：非日语问题先翻译成日语再检索（检索/校验口径不变）
+        long tQuestion = System.currentTimeMillis();
         String searchQuestion = question;
         if (!isJapanese(language)) {
             try {
@@ -83,11 +86,15 @@ public class SkbHandlerImpl implements SkbHandler {
                 log.warn("staff_qa question translate failed, fallback to original: {}", e.getMessage());
             }
         }
+        long questionMs = System.currentTimeMillis() - tQuestion;
 
+        long tRag = System.currentTimeMillis();
         SkbResult result = service.answer(searchQuestion, ctx.customerId(), ctx.storeId(), "skb");
+        long ragMs = System.currentTimeMillis() - tRag;
 
         // 回答仍是日语；校验通过后翻译回员工语言
         String answer = result.answer();
+        long tTranslate = System.currentTimeMillis();
         if (!isJapanese(language)) {
             try {
                 answer = llm.translate(answer, language);
@@ -100,12 +107,19 @@ public class SkbHandlerImpl implements SkbHandler {
                 return;
             }
         }
+        long translateMs = System.currentTimeMillis() - tTranslate;
 
         ingestion.recordQa(new QaLog(
                 ctx.customerId(), ctx.storeId(), ctx.deviceId(), ctx.sessionId(), turnId,
                 "skb", question, answer, result.status(),
                 result.sourceRefs() == null ? null : String.join(",", result.sourceRefs())));
 
+        // 先回文本，设备先有响应；再合成语音，降低等待超时概率
+        ctx.sendText(OutboundMessage.builder()
+                .type("answer").sessionId(ctx.sessionId()).turnId(turnId)
+                .text(answer).sourceRefs(result.sourceRefs()).build());
+
+        long tTts = System.currentTimeMillis();
         byte[] tts;
         try {
             tts = speech.synthesize(answer, language);
@@ -113,14 +127,13 @@ public class SkbHandlerImpl implements SkbHandler {
             ctx.sendText(error(ctx, turnId, "E_PROVIDER", "服务暂不可用，稍后再试"));
             return;
         }
+        long ttsMs = System.currentTimeMillis() - tTts;
 
-        // answer(文本 + source_refs) → TTS 分片 → tts_end（接口规范 §5.2）
-        ctx.sendText(OutboundMessage.builder()
-                .type("answer").sessionId(ctx.sessionId()).turnId(turnId)
-                .text(answer).sourceRefs(result.sourceRefs()).build());
         sendTtsChunk(ctx, turnId, tts);
         ctx.sendText(OutboundMessage.builder()
                 .type("tts_end").sessionId(ctx.sessionId()).turnId(turnId).build());
+        log.info("staff_qa timings: lang={} asr={}ms question={}ms rag={}ms translate={}ms tts={}ms total={}ms",
+                language, asrMs, questionMs, ragMs, translateMs, ttsMs, System.currentTimeMillis() - t0);
     }
 
     private static String normalizeLanguage(String language) {
