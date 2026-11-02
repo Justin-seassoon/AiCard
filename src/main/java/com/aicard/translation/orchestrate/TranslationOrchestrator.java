@@ -32,7 +32,8 @@ public class TranslationOrchestrator {
         if ("fixed".equals(translationMode)) {
             return translateFixed(audio, sourceSide, langPair, state, onTtsAudioChunk);
         }
-        return translateAuto(audio, sourceSide, whitelistHit, state, candidates, staffLanguage, onTtsAudioChunk);
+        return translateAuto(audio, sourceSide, langPair, whitelistHit, state, candidates,
+                staffLanguage, onTtsAudioChunk);
     }
 
     /** fixed 模式：跳过 LID 与软锁定，直接按 lang_pair 双向翻译（spec §7.7）。 */
@@ -54,7 +55,8 @@ public class TranslationOrchestrator {
     }
 
     /** AUTO 模式：LID 独立前置 → 软锁定决策 → 一步流式翻译（spec §7.4）。 */
-    private TranslationResult translateAuto(byte[] audio, String sourceSide, boolean whitelistHit,
+    private TranslationResult translateAuto(byte[] audio, String sourceSide, String langPair,
+                                            boolean whitelistHit,
                                             TranslationSessionState state, List<String> candidates,
                                             String staffLanguage, Consumer<byte[]> onTtsAudioChunk) {
         LidResult lid;
@@ -67,6 +69,22 @@ public class TranslationOrchestrator {
         DirectionDecision d = decision.decide(new DecisionInput(
                 sourceSide, lid.lidLang(), lid.lidConfidence(), whitelistHit, staffLanguage,
                 state.visitorLanguage(), state.pending(), 0.8, 0.95));
+
+        // 员工先说话、还没有 visitor_language 记忆时，按 lang_pair 反向兜底，避免 auto 模式完全无音频
+        if ("repeat".equals(d.action()) && "wearer".equals(sourceSide)
+                && "UNKNOWN".equals(state.visitorLanguage())) {
+            String[] pair = langPair == null ? new String[0] : langPair.split("-");
+            if (pair.length >= 2) {
+                String visitor = toLocale(pair[0]);
+                try {
+                    provider.translateToSpeech(audio, staffLanguage, visitor, onTtsAudioChunk);
+                    state.lock(visitor);
+                    return new TranslationResult("translate", null, visitor);
+                } catch (ProviderException e) {
+                    return new TranslationResult("repeat", "E_PROVIDER", state.visitorLanguage());
+                }
+            }
+        }
 
         switch (d.action()) {
             case "repeat" -> {
@@ -93,5 +111,16 @@ public class TranslationOrchestrator {
                 return new TranslationResult("repeat", "E_LID_LOW", state.visitorLanguage());
             }
         }
+    }
+
+    private static String toLocale(String lang) {
+        if (lang == null) return null;
+        return switch (lang) {
+            case "zh" -> "zh-CN";
+            case "ja" -> "ja-JP";
+            case "en" -> "en-US";
+            case "ko" -> "ko-KR";
+            default -> lang;
+        };
     }
 }

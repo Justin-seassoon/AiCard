@@ -63,6 +63,21 @@ class TranslationOrchestratorTest {
     }
 
     @Test
+    void autoWearerWithoutVisitorLanguageFallsBackToLangPair() {
+        provider.setTranslatedText("你好");
+        provider.setTtsAudio(new byte[]{3});
+        List<byte[]> chunks = new ArrayList<>();
+
+        TranslationResult r = orchestrator.translateUtterance(
+                new byte[]{1}, "wearer", "auto", "zh-ja", false, new TranslationSessionState(),
+                List.of("ja-JP", "zh-CN"), "ja-JP", chunks::add);
+
+        assertThat(r.action()).isEqualTo("translate");
+        assertThat(chunks).containsExactly(new byte[]{3});
+        assertThat(r.newVisitorLanguage()).isEqualTo("zh-CN");
+    }
+
+    @Test
     void lowConfidenceReturnsRepeatWithoutTts() {
         provider.setLidResult(new LidResult("zh-CN", 0.3));
         List<byte[]> chunks = new ArrayList<>();
