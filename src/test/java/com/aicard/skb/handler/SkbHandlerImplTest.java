@@ -5,7 +5,6 @@ import com.aicard.gateway.protocol.InboundMessage;
 import com.aicard.gateway.protocol.OutboundMessage;
 import com.aicard.gateway.protocol.TtsAudioFrame;
 import com.aicard.gateway.session.SessionContext;
-import com.aicard.ingestion.model.QaLog;
 import com.aicard.ingestion.service.IngestionService;
 import com.aicard.provider.api.ProviderException;
 import com.aicard.provider.api.SpeechProvider;
@@ -58,45 +57,59 @@ class SkbHandlerImplTest {
     }
 
     @Test
-    void chineseQuestionIsTranslatedAroundTheJapaneseKnowledgeBase() {
+    void chineseQuestionUsesCrossLingualRetrievalAndLocalizedAnswer() {
         when(speech.transcribe(any(), eq("zh-CN"))).thenReturn("早餐几点开始？");
-        when(llm.translate("早餐几点开始？", "ja-JP")).thenReturn("朝食は何時ですか");
-        when(skb.answer("朝食は何時ですか", 7L, 8L, "skb"))
-                .thenReturn(SkbResult.ok("朝食は7時からです", List.of("FAQ#1")));
-        when(llm.translate("朝食は7時からです", "zh-CN")).thenReturn("早餐7点开始。");
+        when(skb.answerLocalized("早餐几点开始？", 7L, 8L, "skb", "zh-CN"))
+                .thenReturn(new SkbService.LocalizedAnswer(
+                        SkbResult.ok("朝食は7時からです", List.of("FAQ#1")), "早餐7点开始。"));
 
         ask(ctx("zh-CN"));
 
         verify(speech).transcribe(any(), eq("zh-CN"));
-        verify(llm).translate("早餐几点开始？", "ja-JP");
-        verify(skb).answer("朝食は何時ですか", 7L, 8L, "skb");
-        verify(llm).translate("朝食は7時からです", "zh-CN");
+        verify(llm, never()).translate(anyString(), anyString());
+        verify(skb).answerLocalized("早餐几点开始？", 7L, 8L, "skb", "zh-CN");
         verify(speech).synthesize("早餐7点开始。", "zh-CN");
         assertThat(answerText()).isEqualTo("早餐7点开始。");
-
-        verify(ingestion).recordQa(argThat((QaLog l) ->
-                "早餐几点开始？".equals(l.question()) && "早餐7点开始。".equals(l.answer())));
     }
 
     @Test
-    void questionTranslationFailureFallsBackToOriginalQuestion() {
+    void chineseNoMatchFallsBackToJapaneseQuestion() {
+        when(speech.transcribe(any(), eq("zh-CN"))).thenReturn("早餐几点开始？");
+        when(skb.answerLocalized("早餐几点开始？", 7L, 8L, "skb", "zh-CN"))
+                .thenReturn(new SkbService.LocalizedAnswer(SkbResult.noMatch(), null));
+        when(llm.translate("早餐几点开始？", "ja-JP")).thenReturn("朝食は何時ですか");
+        when(skb.answerLocalized("朝食は何時ですか", 7L, 8L, "skb", "zh-CN"))
+                .thenReturn(new SkbService.LocalizedAnswer(
+                        SkbResult.ok("朝食は7時からです", List.of("FAQ#1")), "早餐7点开始。"));
+
+        ask(ctx("zh-CN"));
+
+        verify(llm).translate("早餐几点开始？", "ja-JP");
+        verify(skb).answerLocalized("朝食は何時ですか", 7L, 8L, "skb", "zh-CN");
+        verify(speech).synthesize("早餐7点开始。", "zh-CN");
+        assertThat(answerText()).isEqualTo("早餐7点开始。");
+    }
+
+    @Test
+    void questionTranslationFailureKeepsNoMatchAnswer() {
         when(speech.transcribe(any(), eq("en-US"))).thenReturn("When is breakfast?");
+        when(skb.answerLocalized("When is breakfast?", 7L, 8L, "skb", "en-US"))
+                .thenReturn(new SkbService.LocalizedAnswer(SkbResult.noMatch(), null));
         when(llm.translate("When is breakfast?", "ja-JP")).thenThrow(new ProviderException("llm down"));
-        when(skb.answer("When is breakfast?", 7L, 8L, "skb"))
-                .thenReturn(SkbResult.ok("Breakfast is from 7am", List.of()));
-        when(llm.translate("Breakfast is from 7am", "en-US")).thenReturn("Breakfast is from 7am.");
+        when(llm.translate("知識ベースに明確な記載がありません", "en-US"))
+                .thenReturn("There is no clear answer in the knowledge base.");
 
         ask(ctx("en-US"));
 
-        verify(skb).answer("When is breakfast?", 7L, 8L, "skb");
-        verify(speech).synthesize("Breakfast is from 7am.", "en-US");
+        verify(speech).synthesize("There is no clear answer in the knowledge base.", "en-US");
     }
 
     @Test
-    void answerTranslationFailureReturnsProviderError() {
+    void answerLocalizationFailureReturnsProviderError() {
         when(speech.transcribe(any(), eq("vi-VN"))).thenReturn("Bữa sáng mấy giờ?");
-        when(skb.answer("Bữa sáng mấy giờ?", 7L, 8L, "skb"))
-                .thenReturn(SkbResult.ok("朝食は7時からです", List.of()));
+        when(skb.answerLocalized("Bữa sáng mấy giờ?", 7L, 8L, "skb", "vi-VN"))
+                .thenReturn(new SkbService.LocalizedAnswer(
+                        SkbResult.ok("朝食は7時からです", List.of()), null));
         when(llm.translate("朝食は7時からです", "vi-VN")).thenThrow(new ProviderException("llm down"));
 
         ask(ctx("vi-VN"));

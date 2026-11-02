@@ -73,31 +73,46 @@ public class SkbHandlerImpl implements SkbHandler {
         }
         long asrMs = System.currentTimeMillis() - t0;
 
-        // 知识库是日语：非日语问题先翻译成日语再检索（检索/校验口径不变）
-        long tQuestion = System.currentTimeMillis();
-        String searchQuestion = question;
-        if (!isJapanese(language)) {
-            try {
-                String translated = llm.translate(question, KB_LANGUAGE);
-                if (translated != null && !translated.isBlank()) {
-                    searchQuestion = translated;
+        // 非日语：跨语言阈值直接检索 + 一次生成日文/本地化答案；未命中再译日重试
+        long questionMs = 0;
+        long ragMs = 0;
+        SkbResult result;
+        String answer;
+        if (isJapanese(language)) {
+            long t = System.currentTimeMillis();
+            result = service.answer(question, ctx.customerId(), ctx.storeId(), "skb");
+            ragMs = System.currentTimeMillis() - t;
+            answer = result.answer();
+        } else {
+            long t = System.currentTimeMillis();
+            SkbService.LocalizedAnswer localized = service.answerLocalized(
+                    question, ctx.customerId(), ctx.storeId(), "skb", language);
+            result = localized.result();
+            ragMs = System.currentTimeMillis() - t;
+            if ("no_match".equals(result.status())) {
+                long tq = System.currentTimeMillis();
+                try {
+                    String translated = llm.translate(question, KB_LANGUAGE);
+                    if (translated != null && !translated.isBlank() && !translated.equals(question)) {
+                        long t2 = System.currentTimeMillis();
+                        localized = service.answerLocalized(
+                                translated, ctx.customerId(), ctx.storeId(), "skb", language);
+                        result = localized.result();
+                        ragMs += System.currentTimeMillis() - t2;
+                    }
+                } catch (ProviderException e) {
+                    log.warn("staff_qa question translate failed, keep original result: {}", e.getMessage());
                 }
-            } catch (ProviderException e) {
-                log.warn("staff_qa question translate failed, fallback to original: {}", e.getMessage());
+                questionMs = System.currentTimeMillis() - tq;
             }
+            answer = localized.localizedAnswer();
         }
-        long questionMs = System.currentTimeMillis() - tQuestion;
 
-        long tRag = System.currentTimeMillis();
-        SkbResult result = service.answer(searchQuestion, ctx.customerId(), ctx.storeId(), "skb");
-        long ragMs = System.currentTimeMillis() - tRag;
-
-        // 回答仍是日语；校验通过后翻译回员工语言
-        String answer = result.answer();
         long tTranslate = System.currentTimeMillis();
-        if (!isJapanese(language)) {
+        if (!isJapanese(language) && (answer == null || answer.isBlank())) {
+            // 供应商未返回本地化答案（或 no_match）时回退翻译
             try {
-                answer = llm.translate(answer, language);
+                answer = llm.translate(result.answer(), language);
             } catch (ProviderException e) {
                 ctx.sendText(error(ctx, turnId, "E_PROVIDER", "服务暂不可用，稍后再试"));
                 return;

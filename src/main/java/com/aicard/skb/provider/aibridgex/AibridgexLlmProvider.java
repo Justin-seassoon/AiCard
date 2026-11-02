@@ -35,6 +35,18 @@ public class AibridgexLlmProvider implements LLMProvider {
             6. 回答は日本語で、一文程度にしてください。
             """;
 
+    private static final String SYSTEM_PROMPT_LOCALIZED = """
+            あなたはサービス業店舗の社員向けナレッジベースの回答アシスタントです。
+            提供された「知識断片」だけを使って、社員の質問に簡潔に答えてください。
+            規則：
+            1. 「知識断片」以外の知識で答えないでください。断片に答えがない場合は answer_ja を「知識ベースに明確な記載がありません」にしてください。
+            2. 各断片には番号（chunk_id）があります。
+            3. 出力は JSON オブジェクト 1 つだけにしてください（他の文字は一切出さない）。
+            4. 形式：{"answer_ja":"日本語の回答","answer_localized":"指定言語の回答","cited_chunk_ids":[引用した断片の chunk_id]}
+            5. cited_chunk_ids には実際に存在する chunk_id だけを入れてください。使わなかった断片は入れない。
+            6. answer_ja は日本語で一文程度。answer_localized は「回答言語」で自然な一文にし、固有名詞・数値は正確に。
+            """;
+
     private static final String TRANSLATE_PROMPT = """
             あなたは翻訳アシスタントです。与えられたテキストを指定された言語に翻訳してください。
             翻訳結果だけを出力してください（説明や引用符は付けない）。
@@ -140,6 +152,35 @@ public class AibridgexLlmProvider implements LLMProvider {
             return result != null ? result : new LlmResult("", List.of());
         } catch (Exception e) {
             throw new ProviderException("aibridgex llm failed", e);
+        }
+    }
+
+    @Override
+    public LocalizedLlmResult generateLocalized(String question, List<RetrievedChunk> context,
+                                                String targetLang) {
+        String url = baseUrl + "/chat/completions";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(apiKey);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = Map.of(
+                "model", model,
+                "messages", List.of(
+                        Map.of("role", "system", "content", SYSTEM_PROMPT_LOCALIZED),
+                        Map.of("role", "user", "content",
+                                "回答言語: " + targetLang + "\n" + buildUserPrompt(question, context))));
+
+        try {
+            ResponseEntity<Map> resp = rest.postForEntity(url, new HttpEntity<>(body, headers), Map.class);
+            Map<String, Object> respBody = resp.getBody();
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) respBody.get("choices");
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            String content = (String) message.get("content");
+            LocalizedLlmResult result = parseLocalized(content);
+            return result != null ? result : new LocalizedLlmResult("", null, List.of());
+        } catch (Exception e) {
+            throw new ProviderException("aibridgex llm localized failed", e);
         }
     }
 
@@ -352,6 +393,28 @@ public class AibridgexLlmProvider implements LLMProvider {
                 }
             }
             return new LlmResult(answer, cited);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** 解析「日语答案 + 员工语言答案」的 JSON；解析失败返回 null。 */
+    private LocalizedLlmResult parseLocalized(String content) {
+        String json = extractJson(content);
+        if (json == null) {
+            return null;
+        }
+        try {
+            JsonNode node = mapper.readTree(json);
+            String answer = node.path("answer_ja").asText("");
+            String localized = node.path("answer_localized").asText("");
+            List<Long> cited = new ArrayList<>();
+            for (JsonNode id : node.path("cited_chunk_ids")) {
+                if (id.isNumber()) {
+                    cited.add(id.asLong());
+                }
+            }
+            return new LocalizedLlmResult(answer, localized.isBlank() ? null : localized, cited);
         } catch (Exception e) {
             return null;
         }

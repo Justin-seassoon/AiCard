@@ -7,7 +7,21 @@ import java.util.List;
 
 /** 受限生成（LLM）：基于命中片段回答问题，引用必须选自 context 片段 ID。demo 用 Mock。 */
 public interface LLMProvider {
+
+    /** 本地化生成结果：日语答案用于质量校验，localizedAnswer 直接给员工语言。 */
+    record LocalizedLlmResult(String answer, String localizedAnswer, List<Long> citedChunkIds) {}
+
     LlmResult generate(String question, List<RetrievedChunk> context);
+
+    /**
+     * 一次生成日语答案 + 员工语言答案，避免再多一次翻译调用。
+     * 默认实现不支持本地化（localizedAnswer=null），由调用方回退到 translate。
+     */
+    default LocalizedLlmResult generateLocalized(String question, List<RetrievedChunk> context,
+                                                 String targetLang) {
+        LlmResult r = generate(question, context);
+        return new LocalizedLlmResult(r.answer(), null, r.citedChunkIds());
+    }
 
     /** 文本翻译：把 text 翻译成 targetLang（VKB 答案反向翻译用）。 */
     String translate(String text, String targetLang);

@@ -82,6 +82,11 @@ device-log:
   max-raw-bytes: ${DEVICE_LOG_MAX_RAW_BYTES:1048576}
   rate-limit-seconds: ${DEVICE_LOG_RATE_LIMIT_SECONDS:60}
   cleanup-cron: "0 40 3 * * *"
+skb:
+  # 日语知识库检索阈值；跨语言（非日语问题直接检索）阈值更低
+  theta-retr: 0.55
+  theta-retr-cross-lingual: 0.45
+  theta-check: 0.6
 management:
   endpoints:
     web:

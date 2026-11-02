@@ -63,7 +63,9 @@ public class SkbConfig {
     public SkbService skbService(EmbeddingProvider embeddings, KnowledgeStore store, LLMProvider llm,
                                  KeywordExtractor keywordExtractor,
                                  @Value("${skb.theta-retr:0.55}") double thetaRetr,
+                                 @Value("${skb.theta-retr-cross-lingual:0.45}") double thetaRetrCrossLingual,
                                  @Value("${skb.theta-check:0.6}") double thetaCheck) {
-        return new SkbService(embeddings, store, llm, keywordExtractor, thetaRetr, thetaCheck);
+        return new SkbService(embeddings, store, llm, keywordExtractor, thetaRetr,
+                thetaRetrCrossLingual, thetaCheck);
     }
 }
