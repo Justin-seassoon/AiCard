@@ -25,6 +25,7 @@ import com.aicard.translation.qualify.UtteranceQuality;
 import com.aicard.translation.state.TranslationSessionState;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
@@ -70,7 +71,14 @@ public class TranslationHandlerImpl implements TranslationHandler {
 
     private static final List<String> DEFAULT_CANDIDATES = List.of("ja-JP", "zh-CN", "en-US", "ko-KR");
     private static final int CHUNK_SIZE = 8000;
-    private static final long VKB_TIMEOUT_SECONDS = 5;
+
+    /** VKB 自动应答开关；联调期可通过 TRANSLATION_VKB_ENABLED=false 关闭，auto 直接播翻译原文。 */
+    @Value("${translation.vkb-enabled:true}")
+    private boolean vkbEnabled = true;
+
+    /** VKB 命中后等待服务人员按 OK 的秒数；超时回退播翻译原文。 */
+    @Value("${translation.vkb-timeout-seconds:5}")
+    private long vkbTimeoutSeconds = 5;
 
     public TranslationHandlerImpl(TranslationOrchestrator orchestrator, SpeechProvider speech,
                                   IngestionService ingestion, SkbService skbService, LLMProvider llm,
@@ -185,12 +193,12 @@ public class TranslationHandlerImpl implements TranslationHandler {
 
             // 撞 VKB（游客语言已确定才撞）
             boolean vkbHit = false;
-            if (!"UNKNOWN".equals(visitor)) {
+            if (vkbEnabled && !"UNKNOWN".equals(visitor)) {
                 SkbResult vkb = tryVkb(result.translatedText(), ctx);
                 if (vkb != null && "ok".equals(vkb.status())) {
                     sendTtsChunk(ctx, turnId, BeepAudio.beepBeep());
                     ScheduledFuture<?> timeout = scheduler.schedule(
-                            () -> timeoutVkb(ctx.sessionId()), VKB_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+                            () -> timeoutVkb(ctx.sessionId()), vkbTimeoutSeconds, TimeUnit.SECONDS);
                     pendingVkbs.put(ctx.sessionId(),
                             new PendingVkb(ctx, turnId, vkb.answer(), originalTts, visitor, timeout));
                     vkbHit = true;

@@ -42,6 +42,9 @@ azure:
     key: ${AZURE_OPENAI_KEY:}
     embedding-deployment: ${AZURE_OPENAI_EMBEDDING_DEPLOYMENT:text-embedding-3-small}
 translation:
+  # VKB 自动应答：命中后「嘀嘀」等待服务人员按 OK；联调期可设 TRANSLATION_VKB_ENABLED=false 直接播翻译原文
+  vkb-enabled: ${TRANSLATION_VKB_ENABLED:true}
+  vkb-timeout-seconds: ${TRANSLATION_VKB_TIMEOUT_SECONDS:5}
   qualify:
     min-utt-duration-ms: 200        # spec 待定，联调可调
     numeric-filter: true
