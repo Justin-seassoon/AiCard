@@ -34,7 +34,7 @@ public class DeviceController {
     }
 
     @PostMapping
-    public DeviceDto create(@RequestBody DeviceDto req) {
+    public DeviceCreateResponse create(@RequestBody DeviceDto req) {
         Tenant t = TenantContext.require();
         Device d = Device.builder()
                 .deviceId(req.deviceId())
@@ -46,6 +46,15 @@ public class DeviceController {
                 .staffNo(req.staffNo())
                 .createdAt(Instant.now())
                 .build();
-        return DeviceDto.from(devices.save(d));
+        return DeviceCreateResponse.of(devices.save(d));
+    }
+
+    /** 设备注册响应：含一次性 token（仅注册时返回；列表接口不返回 token，避免泄露全部设备凭证）。 */
+    public record DeviceCreateResponse(String deviceId, String token, Long customerId, Long storeId,
+                                       String staffLanguage, String staffName, String staffNo) {
+        public static DeviceCreateResponse of(Device d) {
+            return new DeviceCreateResponse(d.getDeviceId(), d.getToken(), d.getCustomerId(), d.getStoreId(),
+                    d.getStaffLanguage(), d.getStaffName(), d.getStaffNo());
+        }
     }
 }

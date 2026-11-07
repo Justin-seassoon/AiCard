@@ -3,6 +3,7 @@ package com.aicard.admin.controller;
 import com.aicard.common.domain.Device;
 import com.aicard.common.repository.DeviceRepository;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
@@ -11,7 +12,9 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.time.Instant;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -43,6 +46,15 @@ class DeviceControllerTest {
                         .contentType("application/json")
                         .content("{\"device_id\":\"dev-9\",\"staff_language\":\"zh-CN\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.device_id").value("dev-9"));
+                .andExpect(jsonPath("$.device_id").value("dev-9"))
+                .andExpect(jsonPath("$.customer_id").value(1))
+                .andExpect(jsonPath("$.store_id").value(2))
+                .andExpect(jsonPath("$.token").isNotEmpty());
+
+        ArgumentCaptor<Device> captor = ArgumentCaptor.forClass(Device.class);
+        verify(devices).save(captor.capture());
+        assertThat(captor.getValue().getToken()).isNotBlank();
+        assertThat(captor.getValue().getCustomerId()).isEqualTo(1L);
+        assertThat(captor.getValue().getStoreId()).isEqualTo(2L);
     }
 }

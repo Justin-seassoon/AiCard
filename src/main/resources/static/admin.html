@@ -120,6 +120,7 @@
     <button class="tab" data-tab="agent">任务执行</button>
     <button class="tab" data-tab="devlog">诊断日志</button>
     <button class="tab" data-tab="release">版本发布</button>
+    <button class="tab" data-tab="device">设备管理</button>
   </nav>
 
   <!-- ==================== 周报 / 月报 ==================== -->
@@ -567,6 +568,37 @@
       </div>
     </div>
   </section>
+
+  <!-- ==================== 设备管理 ==================== -->
+  <section id="panel-device" class="panel">
+    <div class="card">
+      <h2>注册设备</h2>
+      <p style="color:#888;margin:0 0 12px;">注册后生成一次性 Token（仅本次返回，请立即保存），端侧用 device_id + token 连 WSS。</p>
+      <div class="form-grid">
+        <div class="field"><label>设备ID <span class="req">*</span></label><input id="dev-id" placeholder="设备真实 device_id"></div>
+        <div class="field"><label>员工语言</label><input id="dev-lang" placeholder="ja-JP"></div>
+        <div class="field"><label>员工姓名</label><input id="dev-name" placeholder="田中"></div>
+        <div class="field"><label>员工工号</label><input id="dev-no" placeholder="E001"></div>
+        <div class="field" style="display:flex;align-items:flex-end;">
+          <button class="primary" onclick="registerDevice()">注册并生成 Token</button>
+        </div>
+      </div>
+      <div id="dev-token-result" style="margin-top:12px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>设备列表</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>设备ID</th><th>员工姓名</th><th>员工语言</th><th>员工工号</th>
+          </tr></thead>
+          <tbody id="dev-tbody"></tbody>
+        </table>
+        <div class="empty" id="dev-empty" style="display:none;">暂无设备</div>
+      </div>
+    </div>
+  </section>
 </div>
 
 <!-- modal -->
@@ -627,7 +659,7 @@
       document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks, gap: loadGaps, docgen: loadDocgen, meeting: loadMeetings, agent: loadAgentTasks, devlog: loadDeviceLogs, release: loadOtaReleases };
+      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks, gap: loadGaps, docgen: loadDocgen, meeting: loadMeetings, agent: loadAgentTasks, devlog: loadDeviceLogs, release: loadOtaReleases, device: loadDevices };
       loader[btn.dataset.tab]();
     });
   });
@@ -1575,6 +1607,59 @@
   document.getElementById('modal-mask').addEventListener('click', function (e) {
     if (e.target === this) closeModal();
   });
+
+  // ==================== 设备管理 ====================
+  function registerDevice() {
+    var deviceId = document.getElementById('dev-id').value.trim();
+    if (!deviceId) { toast('请填写设备ID', false); return; }
+    var body = {
+      device_id: deviceId,
+      staff_language: document.getElementById('dev-lang').value.trim() || null,
+      staff_name: document.getElementById('dev-name').value.trim() || null,
+      staff_no: document.getElementById('dev-no').value.trim() || null
+    };
+    api('/api/devices', 'POST', body)
+      .then(function (d) {
+        var ws = 'wss://' + location.hostname + ':58083/ws?device_id=' + d.device_id
+          + '&token=' + d.token + '&fw_version=0.0.1&proto_ver=1';
+        document.getElementById('dev-token-result').innerHTML =
+          '<div style="border:1px solid #c9e2c9;background:#f2f9f2;padding:12px;border-radius:4px;">'
+          + '<div>设备 <b class="mono">' + escapeHtml(d.device_id) + '</b> 已注册，Token（<b>仅本次显示，请立即保存</b>）：</div>'
+          + '<div class="mono" style="word-break:break-all;background:#fff;padding:8px;border-radius:4px;margin:8px 0;">' + escapeHtml(d.token) + '</div>'
+          + '<div style="margin:8px 0;">握手地址：<code class="mono" style="word-break:break-all;">' + escapeHtml(ws) + '</code></div>'
+          + '<button class="small" onclick="copyDevToken(this)" data-token="' + escapeHtml(d.token) + '">复制 Token</button>'
+          + '</div>';
+        toast('设备已注册', true);
+        loadDevices();
+      })
+      .catch(function (e) { toast('注册失败：' + e.message, false); });
+  }
+
+  function copyDevToken(btn) {
+    var t = btn.getAttribute('data-token');
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(t).then(function () { toast('已复制', true); },
+        function () { toast('复制失败，请手动选择复制', false); });
+    } else {
+      toast('浏览器不支持，请手动选择复制', false);
+    }
+  }
+
+  function loadDevices() {
+    api('/api/devices')
+      .then(function (list) {
+        var rows = (list || []).map(function (d) {
+          return '<tr>'
+            + '<td class="mono">' + escapeHtml(d.device_id) + '</td>'
+            + '<td>' + escapeHtml(d.staff_name || '—') + '</td>'
+            + '<td>' + escapeHtml(d.staff_language || '—') + '</td>'
+            + '<td>' + escapeHtml(d.staff_no || '—') + '</td>'
+            + '</tr>';
+        }).join('');
+        setTbody('dev-tbody', rows, 'dev-empty', (list || []).length);
+      })
+      .catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
 
   // ---------- 初始加载 ----------
   loadReports();
