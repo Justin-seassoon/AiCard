@@ -184,6 +184,32 @@ class SkbHandlerImplTest {
         assertThat(answerText()).isEqualTo("朝食は7時からです");
     }
 
+    @Test
+    void asrFailureReturnsAsrError() {
+        TranscriptionSession asr = mock(TranscriptionSession.class);
+        when(speech.startTranscription("ja-JP")).thenReturn(asr);
+        when(asr.finish()).thenThrow(new ProviderException("asr down"));
+
+        ask(ctx("ja-JP"));
+
+        assertThat(texts).anyMatch(m -> "error".equals(m.type()) && "E_ASR_FAIL".equals(m.code()));
+        verify(speech, never()).synthesizeStream(anyString(), anyString(), any());
+        assertThat(texts).noneMatch(m -> "tts_end".equals(m.type()));
+    }
+
+    @Test
+    void japaneseNoMatchPlaysFallbackAnswer() {
+        when(speech.transcribe(any(), eq("ja-JP"))).thenReturn("朝食は何時ですか");
+        when(skb.answer("朝食は何時ですか", 7L, 8L, "skb")).thenReturn(SkbResult.noMatch());
+
+        ask(ctx("ja-JP"));
+
+        verify(llm, never()).translate(anyString(), anyString());
+        assertThat(answerText()).isEqualTo("知識ベースに明確な記載がありません");
+        verify(speech).synthesizeStream(eq("知識ベースに明確な記載がありません"), eq("ja-JP"), any());
+        assertThat(texts).anyMatch(m -> "tts_end".equals(m.type()));
+    }
+
     private SessionContext ctx(String staffLanguage) {
         return new SessionContext("s1", "dev-1", 7L, 8L, "staff_qa", "fixed", staffLanguage,
                 texts::add, audio::add);

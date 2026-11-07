@@ -4,6 +4,7 @@ import com.aicard.common.domain.Device;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -210,6 +211,85 @@ class MeetingServiceTest {
                 .isInstanceOf(MeetingException.class)
                 .extracting(e -> ((MeetingException) e).getErrorCode())
                 .isEqualTo("E_MEETING_NOT_FOUND");
+    }
+
+    @Test
+    void uploadChunkRejectsSeqConflict() {
+        Device device = device();
+        Meeting m = meeting();
+        when(meetings.findByMeetingId("mtg-1")).thenReturn(Optional.of(m));
+        MeetingChunk existing = MeetingChunk.builder().meetingId("mtg-1").seq(0)
+                .sizeBytes(1L).storageKey("7/mtg-1/00000000.pcm").build();
+        when(chunks.findByMeetingIdAndSeq("mtg-1", 0)).thenReturn(Optional.of(existing));
+
+        assertThatThrownBy(() -> service.uploadChunk(device, "mtg-1", 0, new byte[]{1, 2}, null))
+                .isInstanceOf(MeetingException.class)
+                .extracting(e -> ((MeetingException) e).getErrorCode())
+                .isEqualTo("E_MEETING_SEQ_CONFLICT");
+    }
+
+    @Test
+    void endWithoutMissingSeqsTranscribes() {
+        Device device = device();
+        Meeting m = meeting();
+        when(meetings.findByMeetingId("mtg-1")).thenReturn(Optional.of(m));
+        when(chunks.findByMeetingIdOrderBySeqAsc("mtg-1")).thenReturn(List.of(chunk(0), chunk(1)));
+
+        Meeting result = service.end(device, "mtg-1", 1);
+
+        assertThat(result.getStatus()).isEqualTo(Meeting.STATUS_TRANSCRIBING);
+        assertThat(service.missingList(result)).isEmpty();
+        verify(processor).process(m.getId());
+    }
+
+    @Test
+    void regenerateResetsToTranscribing() {
+        Meeting m = meeting();
+        m.setStatus(Meeting.STATUS_FAILED);
+        m.setErrorMessage("boom");
+
+        Meeting result = service.regenerate(m);
+
+        assertThat(result.getStatus()).isEqualTo(Meeting.STATUS_TRANSCRIBING);
+        assertThat(result.getErrorMessage()).isNull();
+        verify(processor).process(m.getId());
+    }
+
+    @Test
+    void regenerateFailsWhenAudioDeleted() {
+        Meeting m = meeting();
+        m.setAudioDeletedAt(Instant.now());
+
+        assertThatThrownBy(() -> service.regenerate(m))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void cleanupExpiredAudioDeletesAndMarks() {
+        Meeting m = meeting();
+        when(meetings.findByAudioExpiresAtBeforeAndAudioDeletedAtIsNull(any())).thenReturn(List.of(m));
+
+        assertThat(service.cleanupExpiredAudio()).isEqualTo(1);
+
+        verify(audioStore).deleteMeeting(7L, "mtg-1");
+        assertThat(m.getAudioDeletedAt()).isNotNull();
+        verify(meetings).save(m);
+    }
+
+    @Test
+    void finalizeStaleWithoutExpectedLastSeqUsesLastSeq() {
+        Meeting m = meeting();
+        m.setStatus(Meeting.STATUS_UPLOADING);
+        m.setExpectedLastSeq(null);
+        m.setLastSeq(2);
+        when(meetings.findByStatusInAndUpdatedAtBefore(any(), any())).thenReturn(List.of(m));
+        when(chunks.findByMeetingIdOrderBySeqAsc("mtg-1")).thenReturn(List.of(chunk(0), chunk(1), chunk(2)));
+
+        assertThat(service.finalizeStale()).isEqualTo(1);
+
+        assertThat(m.getExpectedLastSeq()).isEqualTo(2);
+        assertThat(m.getStatus()).isEqualTo(Meeting.STATUS_TRANSCRIBING);
+        verify(processor).process(m.getId());
     }
 
     private static MeetingChunk chunk(int seq) {

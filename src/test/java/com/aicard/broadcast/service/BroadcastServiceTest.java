@@ -1,6 +1,7 @@
 package com.aicard.broadcast.service;
 
 import com.aicard.broadcast.domain.Broadcast;
+import com.aicard.broadcast.domain.BroadcastDelivery;
 import com.aicard.broadcast.domain.DeviceGroup;
 import com.aicard.broadcast.domain.DeviceGroupMember;
 import com.aicard.broadcast.repository.BroadcastDeliveryRepository;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.socket.WebSocketSession;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,6 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -122,6 +125,92 @@ class BroadcastServiceTest {
 
     private DeviceGroupMember member(Long id, String deviceId) {
         return DeviceGroupMember.builder().id(id).groupId(1L).deviceId(deviceId).build();
+    }
+
+    @Test
+    void ackMarksUnacknowledgedDelivery() {
+        BroadcastDelivery d = BroadcastDelivery.builder().broadcastId(100L).deviceId("dev-a")
+                .translatedText("译文").targetLanguage("zh-CN").build();
+        when(deliveries.findByBroadcastIdAndDeviceId(100L, "dev-a")).thenReturn(Optional.of(d));
+
+        service.ack(100L, "dev-a");
+
+        assertThat(d.getAckAt()).isNotNull();
+        verify(deliveries).save(d);
+    }
+
+    @Test
+    void ackSkipsAlreadyAcknowledged() {
+        BroadcastDelivery d = BroadcastDelivery.builder().broadcastId(100L).deviceId("dev-a")
+                .translatedText("译文").targetLanguage("zh-CN").ackAt(Instant.now()).build();
+        when(deliveries.findByBroadcastIdAndDeviceId(100L, "dev-a")).thenReturn(Optional.of(d));
+
+        service.ack(100L, "dev-a");
+
+        verify(deliveries, never()).save(any());
+    }
+
+    @Test
+    void ackNoopWhenDeliveryMissing() {
+        when(deliveries.findByBroadcastIdAndDeviceId(100L, "dev-a")).thenReturn(Optional.empty());
+
+        service.ack(100L, "dev-a");
+
+        verify(deliveries, never()).save(any());
+    }
+
+    @Test
+    void deliverPendingPushesAndMarksDelivered() {
+        BroadcastDelivery d = BroadcastDelivery.builder().broadcastId(100L).deviceId("dev-a")
+                .translatedText("译文").targetLanguage("zh-CN").build();
+        when(deliveries.findByDeviceIdAndDeliveredAtIsNull("dev-a")).thenReturn(List.of(d));
+        WebSocketSession session = mock(WebSocketSession.class);
+        when(connections.findOnline("dev-a")).thenReturn(Optional.of(session));
+        when(speech.synthesize("译文", "zh-CN")).thenReturn(new byte[]{1});
+        when(pusher.send(any(), any(), any(byte[].class), anyString())).thenReturn(true);
+
+        service.deliverPending("dev-a");
+
+        assertThat(d.getDeliveredAt()).isNotNull();
+        verify(deliveries).save(d);
+    }
+
+    @Test
+    void deliverPendingSkipsWhenNoPending() {
+        when(deliveries.findByDeviceIdAndDeliveredAtIsNull("dev-a")).thenReturn(List.of());
+
+        service.deliverPending("dev-a");
+
+        verify(speech, never()).synthesize(anyString(), anyString());
+    }
+
+    @Test
+    void deliverPendingDoesNothingWhenOffline() {
+        BroadcastDelivery d = BroadcastDelivery.builder().broadcastId(100L).deviceId("dev-a")
+                .translatedText("译文").targetLanguage("zh-CN").build();
+        when(deliveries.findByDeviceIdAndDeliveredAtIsNull("dev-a")).thenReturn(List.of(d));
+        when(connections.findOnline("dev-a")).thenReturn(Optional.empty());
+
+        service.deliverPending("dev-a");
+
+        assertThat(d.getDeliveredAt()).isNull();
+        verify(deliveries, never()).save(d);
+    }
+
+    @Test
+    void deliverPendingLeavesUndeliveredWhenPushFails() {
+        BroadcastDelivery d = BroadcastDelivery.builder().broadcastId(100L).deviceId("dev-a")
+                .translatedText("译文").targetLanguage("zh-CN").build();
+        when(deliveries.findByDeviceIdAndDeliveredAtIsNull("dev-a")).thenReturn(List.of(d));
+        WebSocketSession session = mock(WebSocketSession.class);
+        when(connections.findOnline("dev-a")).thenReturn(Optional.of(session));
+        when(speech.synthesize("译文", "zh-CN")).thenReturn(new byte[]{1});
+        when(pusher.send(any(), any(), any(byte[].class), anyString())).thenReturn(false);
+
+        service.deliverPending("dev-a");
+
+        assertThat(d.getDeliveredAt()).isNull();
+        verify(deliveries, never()).save(d);
     }
 
     private Device device(String deviceId, String staffLanguage) {

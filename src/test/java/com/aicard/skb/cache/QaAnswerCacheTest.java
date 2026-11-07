@@ -69,4 +69,37 @@ class QaAnswerCacheTest {
 
         assertThat(cache.get(key)).isEmpty();
     }
+
+    @Test
+    void expiresAfterTtl() throws Exception {
+        QaAnswerCache cache = new QaAnswerCache(true, 1, 10); // ttl 1 秒
+        QaAnswerCache.Key key = QaAnswerCache.key(1L, 2L, "skb", "zh-CN", THETA, "q");
+        cache.put(key, answer("a"));
+
+        assertThat(cache.get(key)).isPresent();
+
+        Thread.sleep(1100);
+        assertThat(cache.get(key)).isEmpty();
+        assertThat(cache.stats().size()).isZero();
+    }
+
+    @Test
+    void putNullIsNoop() {
+        QaAnswerCache cache = new QaAnswerCache(true, 300, 10);
+        QaAnswerCache.Key key = QaAnswerCache.key(1L, 2L, "skb", null, THETA, "q");
+
+        cache.put(key, null);
+
+        assertThat(cache.get(key)).isEmpty();
+        assertThat(cache.stats().size()).isZero();
+    }
+
+    @Test
+    void normalizesQuestionCaseAndInnerWhitespace() {
+        QaAnswerCache cache = new QaAnswerCache(true, 300, 10);
+        cache.put(QaAnswerCache.key(1L, 2L, "skb", "zh-CN", THETA, "Breakfast   Time"), answer("a"));
+
+        assertThat(cache.get(QaAnswerCache.key(1L, 2L, "skb", "zh-CN", THETA, "breakfast time")))
+                .isPresent();
+    }
 }

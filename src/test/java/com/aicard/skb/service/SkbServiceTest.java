@@ -118,6 +118,31 @@ class SkbServiceTest {
     }
 
     @Test
+    void blocksEmptyCitation() {
+        embeddings.setVector(List.of(1.0f, 0.0f));
+        RetrievedChunk hit = new RetrievedChunk(42L, "早餐", "早餐FAQ", "v1", 0.95, List.of(1.0f, 0.0f));
+        when(store.searchSimilar(anyLong(), anyLong(), anyString(), anyList(), anyInt())).thenReturn(List.of(hit));
+        llm.setResult(new LlmResult("答案", List.of())); // 引用为空
+
+        SkbResult r = service.answer("早餐几点", 1L, 2L, "skb");
+
+        assertThat(r.status()).isEqualTo("no_match");
+    }
+
+    @Test
+    void blocksLowSimilarityAnswer() {
+        embeddings.setVector(List.of(1.0f, 0.0f));
+        // 答案向量与问题向量正交 → 相似度 0 < thetaCheck，拒绝
+        RetrievedChunk hit = new RetrievedChunk(42L, "早餐", "早餐FAQ", "v1", 0.95, List.of(0.0f, 1.0f));
+        when(store.searchSimilar(anyLong(), anyLong(), anyString(), anyList(), anyInt())).thenReturn(List.of(hit));
+        llm.setResult(new LlmResult("答案", List.of(42L)));
+
+        SkbResult r = service.answer("早餐几点", 1L, 2L, "skb");
+
+        assertThat(r.status()).isEqualTo("no_match");
+    }
+
+    @Test
     void fallsBackToKeywordsWhenVectorMisses() {
         embeddings.setVector(List.of(1.0f, 0.0f));
         when(store.searchSimilar(anyLong(), anyLong(), anyString(), anyList(), anyInt())).thenReturn(List.of());

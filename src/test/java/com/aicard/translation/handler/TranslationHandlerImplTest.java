@@ -17,6 +17,7 @@ import com.aicard.translation.orchestrate.TranslationResult;
 import com.aicard.translation.qualify.QualifyTermService;
 import com.aicard.translation.qualify.UtteranceQualifier;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Set;
@@ -245,5 +246,135 @@ class TranslationHandlerImplTest {
         verify(speech).synthesize("早餐6点半到9点半", "zh-CN");
         assertThat(binarySent).anyMatch(f -> f.audio().length == 3);
         assertThat(textSent).anyMatch(m -> "tts_end".equals(m.type()));
+    }
+
+    @Test
+    void autoCounterpartyVkbHitTimeoutFallsBackToOriginal() {
+        TranslationOrchestrator orchestrator = mock(TranslationOrchestrator.class);
+        SpeechProvider speech = mock(SpeechProvider.class);
+        TurnSession turn = mock(TurnSession.class);
+        when(skbService.answer(any(), any(), any(), any()))
+                .thenReturn(SkbResult.ok("朝食は6時半から9時半です", List.of("餐饮@v1#1")));
+        when(speech.startTurnAuto(anyList(), eq("ja-JP"), any()))
+                .thenAnswer(inv -> {
+                    Consumer<byte[]> onTts = inv.getArgument(2);
+                    onTts.accept(new byte[]{9, 9}); // 原文 TTS 缓存
+                    return turn;
+                });
+        when(turn.finish()).thenReturn(new SpeechTranslationResult("你好", "朝食は何時ですか", "zh-CN"));
+
+        CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
+        CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier, terms);
+        SessionContext ctx = ctx(textSent, binarySent, "auto");
+
+        handler.onAudioChunk(ctx, new AudioChunkFrame("t1", 0, 1L, (byte) 1, (byte) 1, new byte[]{1, 2}));
+        handler.onEndOfUtterance(ctx, eou("t1"));
+
+        // 命中：发 beep 提示（不播原文、不发 tts_end）
+        assertThat(binarySent).anyMatch(f -> f.audio().length > 100);
+        assertThat(textSent).noneMatch(m -> "tts_end".equals(m.type()));
+
+        // 5s 超时未确认：回退播原文 + tts_end，不播答案
+        ReflectionTestUtils.invokeMethod(handler, "timeoutVkb", "s1");
+
+        assertThat(binarySent).anyMatch(f -> f.audio().length == 2);
+        assertThat(textSent).anyMatch(m -> "tts_end".equals(m.type()));
+        verify(llm, never()).translate(any(), any());
+    }
+
+    @Test
+    void autoCounterpartyVkbMissStreamsOriginalDirectly() {
+        TranslationOrchestrator orchestrator = mock(TranslationOrchestrator.class);
+        SpeechProvider speech = mock(SpeechProvider.class);
+        TurnSession turn = mock(TurnSession.class);
+        when(skbService.answer(any(), any(), any(), any())).thenReturn(SkbResult.noMatch());
+        when(speech.startTurnAuto(anyList(), eq("ja-JP"), any()))
+                .thenAnswer(inv -> {
+                    Consumer<byte[]> onTts = inv.getArgument(2);
+                    onTts.accept(new byte[]{9, 9}); // 原文 TTS 缓存
+                    return turn;
+                });
+        when(turn.finish()).thenReturn(new SpeechTranslationResult("你好", "朝食は何時ですか", "zh-CN"));
+
+        CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
+        CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier, terms);
+        SessionContext ctx = ctx(textSent, binarySent, "auto");
+
+        handler.onAudioChunk(ctx, new AudioChunkFrame("t1", 0, 1L, (byte) 1, (byte) 1, new byte[]{1, 2}));
+        handler.onEndOfUtterance(ctx, eou("t1"));
+
+        // 未命中：不发 beep，直接播原文 + tts_end
+        assertThat(binarySent).noneMatch(f -> f.audio().length > 100);
+        assertThat(binarySent).anyMatch(f -> f.audio().length == 2);
+        assertThat(textSent).anyMatch(m -> "tts_end".equals(m.type()));
+        verify(llm, never()).translate(any(), any());
+    }
+
+    @Test
+    void autoCounterpartyVkbDisabledStreamsOriginalDirectly() {
+        TranslationOrchestrator orchestrator = mock(TranslationOrchestrator.class);
+        SpeechProvider speech = mock(SpeechProvider.class);
+        TurnSession turn = mock(TurnSession.class);
+        when(skbService.answer(any(), any(), any(), any()))
+                .thenReturn(SkbResult.ok("朝食は6時半から9時半です", List.of("餐饮@v1#1")));
+        when(speech.startTurnAuto(anyList(), eq("ja-JP"), any()))
+                .thenAnswer(inv -> {
+                    Consumer<byte[]> onTts = inv.getArgument(2);
+                    onTts.accept(new byte[]{9, 9}); // 原文 TTS 缓存
+                    return turn;
+                });
+        when(turn.finish()).thenReturn(new SpeechTranslationResult("你好", "朝食は何時ですか", "zh-CN"));
+
+        CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
+        CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier, terms);
+        ReflectionTestUtils.setField(handler, "vkbEnabled", false); // 联调期关闭 VKB 自动应答
+        SessionContext ctx = ctx(textSent, binarySent, "auto");
+
+        handler.onAudioChunk(ctx, new AudioChunkFrame("t1", 0, 1L, (byte) 1, (byte) 1, new byte[]{1, 2}));
+        handler.onEndOfUtterance(ctx, eou("t1"));
+
+        // 关闭开关：完全不撞 VKB，直接播原文 + tts_end
+        verify(skbService, never()).answer(any(), any(), any(), any());
+        assertThat(binarySent).noneMatch(f -> f.audio().length > 100);
+        assertThat(binarySent).anyMatch(f -> f.audio().length == 2);
+        assertThat(textSent).anyMatch(m -> "tts_end".equals(m.type()));
+    }
+
+    @Test
+    void autoCounterpartyVkbHitAnswerTranslateFailsFallsBackToOriginal() {
+        TranslationOrchestrator orchestrator = mock(TranslationOrchestrator.class);
+        SpeechProvider speech = mock(SpeechProvider.class);
+        TurnSession turn = mock(TurnSession.class);
+        when(skbService.answer(any(), any(), any(), any()))
+                .thenReturn(SkbResult.ok("朝食は6時半から9時半です", List.of("餐饮@v1#1")));
+        when(llm.translate(any(), any())).thenThrow(new RuntimeException("translate failed"));
+        when(speech.startTurnAuto(anyList(), eq("ja-JP"), any()))
+                .thenAnswer(inv -> {
+                    Consumer<byte[]> onTts = inv.getArgument(2);
+                    onTts.accept(new byte[]{9, 9}); // 原文 TTS 缓存
+                    return turn;
+                });
+        when(turn.finish()).thenReturn(new SpeechTranslationResult("你好", "朝食は何時ですか", "zh-CN"));
+
+        CopyOnWriteArrayList<OutboundMessage> textSent = new CopyOnWriteArrayList<>();
+        CopyOnWriteArrayList<TtsAudioFrame> binarySent = new CopyOnWriteArrayList<>();
+        TranslationHandlerImpl handler = new TranslationHandlerImpl(orchestrator, speech, ingestion, skbService, llm, qualifier, terms);
+        SessionContext ctx = ctx(textSent, binarySent, "auto");
+
+        handler.onAudioChunk(ctx, new AudioChunkFrame("t1", 0, 1L, (byte) 1, (byte) 1, new byte[]{1, 2}));
+        handler.onEndOfUtterance(ctx, eou("t1"));
+
+        // 命中：发 beep 提示
+        assertThat(binarySent).anyMatch(f -> f.audio().length > 100);
+
+        // 按 OK：答案反向翻译失败，回退播原文 + tts_end
+        handler.onButtonEvent(ctx, InboundMessage.builder().type("button_event").sessionId("s1").button("ok").build());
+
+        assertThat(binarySent).anyMatch(f -> f.audio().length == 2);
+        assertThat(textSent).anyMatch(m -> "tts_end".equals(m.type()));
+        verify(speech, never()).synthesize(any(), any());
     }
 }
