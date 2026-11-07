@@ -1,0 +1,190 @@
+<!DOCTYPE html><html lang='zh-CN'><head><meta charset='utf-8'>
+<title>周例会 · 本周工作总结与下周规划</title><style>
+@page { size: A4; margin: 2cm 2.2cm; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: 'Songti SC', 'STSong', 'SimSun', serif; font-size: 10.5pt;
+       line-height: 1.6; color: #1a1a1a; margin: 0; }
+.doctitle { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 18pt; font-weight: 700;
+       text-align: center; margin: 0 0 4pt; color: #111; }
+.subtitle { text-align: center; font-size: 10pt; color: #666; margin: 0 0 14pt; }
+h2 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 13pt; font-weight: 700;
+       color: #1a3c6e; border-left: 4px solid #2b6cb0; padding-left: 8px; margin: 16pt 0 6pt; }
+h3 { font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-size: 12pt; font-weight: 700;
+       color: #1a3c6e; margin: 12pt 0 4pt; }
+p { margin: 3pt 0; }
+blockquote { margin: 6pt 0; padding: 6pt 10pt; background: #f4f7fb; border-left: 3px solid #2b6cb0; color: #333; }
+ul { margin: 4pt 0; padding-left: 0; list-style: none; }
+li { margin: 0 0 4pt; padding-left: 12pt; text-indent: -12pt; }
+li::before { content: '\00b7 '; color: #2b6cb0; font-weight: 700; }
+ul ul { margin: 2pt 0 2pt 10pt; }
+table { border-collapse: collapse; width: 100%; margin: 5pt 0 10pt; font-size: 9pt; }
+th, td { border: 1px solid #b9c4d4; padding: 4pt 7pt; vertical-align: top; text-align: left; }
+th { background: #e8eef7; font-family: 'PingFang SC', 'Heiti SC', sans-serif; font-weight: 700; }
+table.risk th:nth-child(1), table.risk td:nth-child(1) { width: 19%; }
+table.risk th:nth-child(2), table.risk td:nth-child(2) { width: 81%; }
+code { font-family: 'Menlo', 'Monaco', monospace; background: #f0f2f5; padding: 0 3px; border-radius: 3px; font-size: 9.5pt; }
+hr { border: none; border-top: 1px solid #e0e5ec; margin: 12pt 0; }
+b { font-weight: 700; }
+</style></head><body>
+<div class='doctitle'>周例会 · 本周工作总结与下周规划</div>
+<div class='subtitle'>日期：2026-10-31<br>覆盖期：2026-10-24 ~ 2026-10-31（上次周会 10-24）<br>范围：云端后端（姜华团队）</div>
+<hr>
+<blockquote>
+</blockquote>
+<hr>
+<h2>一、本周完成</h2>
+<h3>1. 会议录音端云协议完成对齐与拍板（10-24）</h3>
+<p>把会议录音从“云端自己能用”推进到“端侧可以照着实现”。</p>
+<ul>
+<li>与端侧逐项对齐 14 个协议问题，其中 <b>12 项我方口径已定</b>，<b>2 项待产品 / 合规</b>（现场提示话术、取消会议后音频保留范围）
+</li>
+<li>关键结论：
+<ul>
+<li>会议走 HTTP，不占用翻译的 WSS 长连接
+</li>
+<li>分片改为 <b>5–30 秒</b>（端侧按 PSRAM 预算选），60 / 120 秒不支持
+</li>
+<li>结束必须上报 <code>last_seq</code>，否则末尾丢片发现不了
+</li>
+<li>结束返回缺片列表；有缺片时保持“上传中”，补完再转写；10 分钟无新片自动收尾
+</li>
+<li>新增状态查询接口，设备重启 / 断网后可续传
+</li>
+<li>HTTP 鉴权统一为 Bearer + 设备 ID；音频只支持 PCM16 / 16kHz / 单声道
+</li>
+<li>新增固件版本与能力上报，缺失视为实现错误
+</li></ul>
+</li>
+<li>输出：《端云协议 14 项拍板结论与端侧确认清单》《端云协议对齐与迭代梳理》
+</li>
+<li>仍需端侧确认：首个支持会议录音的固件版本、PSRAM 预算 / 功耗、补片后再调 <code>end</code> 是否可行
+</li></ul>
+<h3>2. 后台功能闭环差距梳理（10-24）</h3>
+<p>对周报、通知、知识缺口、维修点检、文档处理、会议纪要、AI 任务 7 项功能做了一次“离真实业务闭环还差什么”的盘点。</p>
+<ul>
+<li>结论：多数功能停在“有表、有页面、有状态流转”，还缺 <b>角色权限、审批责任、触达回执、执行反馈</b> 四类连接
+</li>
+<li>按“可演示闭环”估算，三个重点功能合计约 16–21 人日；先补共用基础（审批、分发、回执、审计）约 14–18 人日
+</li>
+<li>按“生产可用”估算，每项约 2–4 周，且必须先补用户体系与登录鉴权
+</li>
+<li>用途：作为下一阶段排期输入，本轮演示范围不变
+</li></ul>
+<h3>3. 会议录音 P1-a（云端设备接口）完成并上线（10-29 ~ 10-30）</h3>
+<p>在上周云端 P0 的基础上，把设备侧真正需要的能力补齐，端侧硬件连上即可联调。</p>
+<ul>
+<li><b>4 个设备接口</b>：开始会议、上传分片、结束会议、状态查询
+</li>
+<li><b>鉴权与协议统一</b>：<code>Authorization: Bearer</code> + 设备 ID，旧路径与旧鉴权头已停用
+</li>
+<li><b>结束逻辑改为可补传</b>：有缺片时保持“上传中”并返回缺片列表；补完自动转写，10 分钟无新片自动收尾
+</li>
+<li><b>开始参数强校验</b>：固件版本、能力列表、触发方式（只能现场长按）、提示已播放、分片时长 5–30 秒
+</li>
+<li><b>错误码统一</b>：设备按 <code>E_MEETING_*</code> 处理，不再依赖默认错误格式
+</li>
+<li><b>留痕</b>：固件版本、能力、触发方式、提示播放情况入库，满足合规审计需要
+</li>
+<li>数据升级 V23（只加字段，无破坏性变更）
+</li>
+<li>验证：
+<ul>
+<li>单元测试 27 项全部通过
+</li>
+<li>测试服用真实日语语音跑通“开始 → 分片 → 结束 → 转写 → 纪要 → 待办”，最终生成 Word 可导出
+</li>
+<li>缺片场景实测：结束返回缺片列表 → 补传 → 自动转写
+</li>
+<li>4 个服务容器重建完成，健康检查全部正常
+</li></ul>
+</li></ul>
+<h3>4. 通用设备诊断日志完成并上线（10-30）</h3>
+<p>端侧提出“会议录音缺少日志上传接口”，核实属实后按<b>通用能力</b>立项，不绑死会议场景。</p>
+<ul>
+<li>新增设备日志上传接口：文本 / JSONL，支持 gzip，单次 ≤256KB
+</li>
+<li>限制：同一设备 1 次/分钟；保留 7 天，到期自动删除
+</li>
+<li>日志正文存共享卷，数据库只存索引；后台可按设备、会议、时间查询并下载
+</li>
+<li>已用真实上传验证：无凭证被拒、gzip 上传成功、1 分钟内重复上传被限流、后台下载内容与原始日志完全一致
+</li>
+<li>数据升级 V24（只新增表，无破坏性变更）
+</li>
+<li>意义：以后会议、OTA、翻译的端侧问题都能远程拿到日志，不再只能靠串口或猜
+</li></ul>
+<h3>5. 端侧文档与协议基线同步</h3>
+<ul>
+<li>新增《端侧联调测试文档-会议录音》：连接信息、4 个接口、8 组测试用例、错误码、限制
+</li>
+<li>新增《端侧诊断日志上传说明》：上传方式、大小 / 频率限制、错误码、推荐上传时机
+</li>
+<li>新增《端侧回复-OTA 型号与硬件版本字段》：明确 <code>product_model</code> / <code>hardware_version</code> 填什么、命名规则，以及云端当前尚未做档案比对的现状
+</li>
+<li>协议基线升到 v8：补入设备诊断日志与会议录音实现状态
+</li>
+<li>修正测试服公网入口：确认 <code>https://aicard.seassoon.net:58083</code> 可用；原文档中的 38080 当前不是本服务，38082 公网不可达，已标注待运维核对
+</li></ul>
+<h3>6. 质量与测试</h3>
+<ul>
+<li>本周新增 / 更新自动化测试 <b>39 项，全部通过</b>（会议 27 项、诊断日志 12 项）
+</li>
+<li>会议集成测试 3 项因本机 Docker 不可用未在本地运行；测试服的真实语音端到端已覆盖主链路
+</li>
+<li>部署后做了接口冒烟：旧路径停用、无凭证 401、参数缺失 400、缺片 / 补传 / 自动转写、日志 gzip 上传 / 限流 / 后台下载
+</li>
+<li>系统密钥未写入代码或文档；测试产生的会议与日志数据已清理
+</li></ul>
+<hr>
+<h2>二、下周规划</h2>
+<h3>1. 真机联调（最高优先，依赖硬件团队）</h3>
+<p>云端接口已就绪，等样机固件接入：</p>
+<ul>
+<li>长按开始 / 结束录音，分片按 5–30 秒上传
+</li>
+<li>断网重试、设备重启后按状态查询续传、按缺片列表补传
+</li>
+<li>联合验证：鉴权、开始参数、分片乱序、断电续传、补片后再结束、10 分钟超时
+</li>
+<li>端侧需要提供：首个支持版本号、PSRAM 预算对应的分片时长、补片后再调 <code>end</code> 的结论
+</li></ul>
+<h3>2. 会议纪要 P1-b</h3>
+<ul>
+<li>周报聚合：以已审核纪要 + 待办状态生成员工周报（约 3–5 人日；依赖统计口径拍板）
+</li>
+<li>Azure 批量转写：长录音质量 / 成本优化，可作为可选项
+</li>
+<li>取消会议接口：协议标为可选，是否删除音频待产品 / 合规确认
+</li>
+<li>诊断日志后台页面：当前已有查询 / 下载接口，下周视需要补可视化页面
+</li></ul>
+<h3>3. 演示链路准备</h3>
+<ul>
+<li>串起“会议录音 → 待办 → 周报”的演示线
+</li>
+<li>补齐失败场景：缺片、鉴权失败、断网、转写失败；每个场景给出设备提示与后台状态
+</li>
+<li>更新演示数据与操作手册
+</li></ul>
+<h3>4. 待确认事项</h3>
+<ul>
+<li>现场提示话术与是否二次确认（产品 / 合规）
+</li>
+<li>周报统计口径：哪些纪要计入、待办如何计数、跨周未完成是否滚动
+</li>
+<li>取消会议是否删除音频、保留范围
+</li>
+<li>会议最低固件版本号（端侧提供后云端启用拦截）
+</li></ul>
+<hr>
+<h2>三、需协调 / 风险</h2>
+<table class="risk">
+<tr><th>项</th><th>说明</th></tr>
+<tr><td>真机与固件进度</td><td>长按手势、录音缓存、断电续传依赖硬件团队；云端已可用模拟器和语音文件覆盖演示，但真机联调窗口需要尽快确认</td></tr>
+<tr><td>公网入口</td><td><code>aicard.seassoon.net:58083</code> 已验证可用；原 38080 当前指向非本服务、38082 公网不可达，需运维核对端口映射，避免端侧拿错地址</td></tr>
+<tr><td>合规提示</td><td>只做现场主动发起 + 本地提示的公开录音，不提供远程静默开启；提示话术未定，当前只校验“已提示”留痕</td></tr>
+<tr><td>测试环境</td><td>本机 Docker 不可用，会议集成测试无法本地跑；建议测试服或 CI 固定跑一遍集成测试，避免只靠手工冒烟</td></tr>
+<tr><td>诊断日志频率</td><td>当前限制 1 次/分钟，联调期可能偏紧；如需放宽可通过环境变量调整，但要注意存储与滥用风险</td></tr>
+<tr><td>P1-b 排期</td><td>周报聚合依赖统计口径拍板；若口径迟迟不定，会阻塞 P1-b 的可演示闭环</td></tr>
+</table>
+</body></html>
