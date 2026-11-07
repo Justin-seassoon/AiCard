@@ -119,6 +119,7 @@
     <button class="tab" data-tab="meeting">会议纪要</button>
     <button class="tab" data-tab="agent">任务执行</button>
     <button class="tab" data-tab="devlog">诊断日志</button>
+    <button class="tab" data-tab="release">版本发布</button>
   </nav>
 
   <!-- ==================== 周报 / 月报 ==================== -->
@@ -518,6 +519,54 @@
       </div>
     </div>
   </section>
+
+  <!-- ==================== 版本发布 ==================== -->
+  <section id="panel-release" class="panel">
+    <div class="card">
+      <h2>上传固件（P4 / C5）</h2>
+      <p style="color:#6E685C;font-size:13px;margin:-4px 0 12px;">
+        上传后云端自动计算 size 与 sha256，作为下方发布表单的固件包信息；发布时云端会再次复核，防放错文件。
+      </p>
+      <div class="form-grid">
+        <div class="field"><label>P4 固件</label><input type="file" id="ota-p4-file"></div>
+        <div class="field"><label>C5 固件</label><input type="file" id="ota-c5-file"></div>
+        <div class="field" style="display:flex;align-items:flex-end;">
+          <button class="primary" onclick="uploadOtaFiles()">上传固件</button>
+        </div>
+      </div>
+      <div id="ota-upload-result" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>发布新版本</h2>
+      <div class="form-grid">
+        <div class="field"><label>更新 ID <span class="req">*</span></label><input id="ota-update-id" placeholder="ota-20261106-1"></div>
+        <div class="field">
+          <label>策略 <span class="req">*</span></label>
+          <select id="ota-policy"><option value="optional">普通</option><option value="mandatory">强制</option></select>
+        </div>
+        <div class="field"><label>目标 P4 版本 <span class="req">*</span></label><input id="ota-p4-ver" placeholder="1.2.0"></div>
+        <div class="field"><label>目标 C5 版本 <span class="req">*</span></label><input id="ota-c5-ver" placeholder="1.2.0"></div>
+        <div class="field full"><label>发布说明</label><textarea id="ota-notes" placeholder="本次更新内容"></textarea></div>
+        <div class="field full" style="display:flex;align-items:flex-end;">
+          <button class="primary" onclick="publishOtaRelease()">发布</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>发布历史</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>更新ID</th><th>策略</th><th>P4 版本</th><th>C5 版本</th><th>说明</th><th>状态</th><th>创建时间</th><th>操作</th>
+          </tr></thead>
+          <tbody id="ota-tbody"></tbody>
+        </table>
+        <div class="empty" id="ota-empty" style="display:none;">暂无发布</div>
+      </div>
+    </div>
+  </section>
 </div>
 
 <!-- modal -->
@@ -578,7 +627,7 @@
       document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks, gap: loadGaps, docgen: loadDocgen, meeting: loadMeetings, agent: loadAgentTasks, devlog: loadDeviceLogs };
+      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks, gap: loadGaps, docgen: loadDocgen, meeting: loadMeetings, agent: loadAgentTasks, devlog: loadDeviceLogs, release: loadOtaReleases };
       loader[btn.dataset.tab]();
     });
   });
@@ -1067,6 +1116,101 @@
         downloadDeviceLog(first.log_id);
       })
       .catch(function (e) { toast('查询失败：' + e.message, false); });
+  }
+
+  // ==================== 版本发布（OTA） ====================
+  var OTA_UPLOADS = {};
+  function uploadOtaFiles() {
+    var p4 = document.getElementById('ota-p4-file').files[0];
+    var c5 = document.getElementById('ota-c5-file').files[0];
+    if (!p4 && !c5) { toast('请选择 P4 或 C5 固件', false); return; }
+    var tasks = [];
+    if (p4) tasks.push(uploadOneFw('p4', p4));
+    if (c5) tasks.push(uploadOneFw('c5', c5));
+    Promise.all(tasks).then(function (rs) {
+      rs.forEach(function (r) { OTA_UPLOADS[r.module] = r; });
+      renderOtaUploads();
+      toast('固件上传完成', true);
+    }).catch(function (e) { toast('上传失败：' + e.message, false); });
+  }
+  function uploadOneFw(module, file) {
+    var fd = new FormData();
+    fd.append('module', module);
+    fd.append('file', file);
+    return fetch('/api/ota/files', {
+      method: 'POST',
+      headers: { 'X-Customer-Id': customerId, 'X-Store-Id': storeId },
+      body: fd
+    }).then(function (r) {
+      return r.json().catch(function () { return null; }).then(function (d) {
+        if (!r.ok) throw new Error((d && d.message) || ('HTTP ' + r.status));
+        d.module = module;
+        d.name = file.name;
+        return d;
+      });
+    });
+  }
+  function renderOtaUploads() {
+    var html = '';
+    ['p4', 'c5'].forEach(function (m) {
+      var u = OTA_UPLOADS[m];
+      if (u) html += '<div style="font-size:12px;color:#1a7f37;margin:4px 0;">' + m.toUpperCase()
+        + ' 已就绪：' + escapeHtml(u.name) + '（' + fmtBytes(u.image_size) + '，sha256 <span class="mono">'
+        + escapeHtml(u.sha256.slice(0, 16)) + '…</span>）</div>';
+    });
+    document.getElementById('ota-upload-result').innerHTML = html || '<div class="empty" style="padding:8px 0;">尚未上传固件</div>';
+  }
+  function publishOtaRelease() {
+    var updateId = document.getElementById('ota-update-id').value.trim();
+    var p4Ver = document.getElementById('ota-p4-ver').value.trim();
+    var c5Ver = document.getElementById('ota-c5-ver').value.trim();
+    if (!updateId || !p4Ver || !c5Ver) { toast('请填写更新 ID 与 P4/C5 目标版本', false); return; }
+    var packages = [];
+    if (OTA_UPLOADS.p4) packages.push({ module: 'p4', target_version: p4Ver, image_size: OTA_UPLOADS.p4.image_size, sha256: OTA_UPLOADS.p4.sha256, storage_key: OTA_UPLOADS.p4.storage_key });
+    if (OTA_UPLOADS.c5) packages.push({ module: 'c5', target_version: c5Ver, image_size: OTA_UPLOADS.c5.image_size, sha256: OTA_UPLOADS.c5.sha256, storage_key: OTA_UPLOADS.c5.storage_key });
+    if (!packages.length) { toast('请先上传固件', false); return; }
+    var body = {
+      update_id: updateId,
+      policy: document.getElementById('ota-policy').value,
+      target_p4_version: p4Ver,
+      target_c5_version: c5Ver,
+      release_notes: document.getElementById('ota-notes').value.trim() || null,
+      packages: packages
+    };
+    api('/api/ota/releases', 'POST', body)
+      .then(function () { toast('版本已发布', true); OTA_UPLOADS = {}; renderOtaUploads(); loadOtaReleases(); })
+      .catch(function (e) { toast('发布失败：' + e.message, false); });
+  }
+  function loadOtaReleases() {
+    api('/api/ota/releases')
+      .then(function (list) {
+        var rows = (list || []).map(function (r) {
+          var pkgs = (r.packages || []).map(function (p) {
+            return p.module.toUpperCase() + ' ' + escapeHtml(p.target_version);
+          }).join(' + ');
+          var ops = (r.status === 'active')
+            ? '<button class="small danger" onclick="revokeOtaRelease(' + r.id + ')">撤销</button>'
+            : '<span class="badge gray">已撤销</span>';
+          return '<tr>'
+            + '<td class="mono">' + escapeHtml(r.update_id) + '</td>'
+            + '<td>' + (r.policy === 'mandatory' ? '强制' : '普通') + '</td>'
+            + '<td class="mono">' + escapeHtml(r.target_p4_version) + '</td>'
+            + '<td class="mono">' + escapeHtml(r.target_c5_version) + '</td>'
+            + '<td>' + escapeHtml(r.release_notes || '—') + '</td>'
+            + '<td>' + (r.status === 'active' ? '<span class="badge green">生效中</span>' : '<span class="badge gray">已撤销</span>') + '</td>'
+            + '<td>' + fmtTime(r.created_at) + '</td>'
+            + '<td>' + ops + '</td>'
+            + '</tr>';
+        }).join('');
+        setTbody('ota-tbody', rows, 'ota-empty', (list || []).length);
+      })
+      .catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+  function revokeOtaRelease(id) {
+    if (!confirm('确认撤销该发布？设备将不再收到此版本。')) return;
+    api('/api/ota/releases/' + id + '/revoke', 'POST')
+      .then(function () { toast('已撤销', true); loadOtaReleases(); })
+      .catch(function (e) { toast('撤销失败：' + e.message, false); });
   }
 
   // ==================== 文档处理（③ 读取 / 模板） ====================

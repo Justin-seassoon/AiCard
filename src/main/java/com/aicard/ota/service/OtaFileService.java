@@ -14,6 +14,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.UUID;
 
 /** 固件文件存取 + 短期签名 URL 生成/验证。文件由运维放到 storage-dir，登记元数据时云端复核。 */
 public class OtaFileService {
@@ -104,6 +105,28 @@ public class OtaFileService {
         } catch (NoSuchAlgorithmException e) {
             throw new OtaException(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL", "sha256 unavailable");
         }
+    }
+
+    /** 保存上传的固件，返回 storageKey（文件名净化，路径含 module 前缀 + 随机串防重名）。 */
+    public String store(String module, String originalFilename, byte[] data) {
+        String safeName = sanitize(originalFilename);
+        String storageKey = module + "/" + UUID.randomUUID().toString().replace("-", "") + "-" + safeName;
+        Path target = resolve(storageKey);
+        try {
+            Files.createDirectories(target.getParent());
+            Files.write(target, data);
+        } catch (IOException e) {
+            throw new OtaException(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL", "failed to store firmware");
+        }
+        return storageKey;
+    }
+
+    private String sanitize(String name) {
+        if (name == null || name.isBlank()) {
+            return "firmware.bin";
+        }
+        String base = name.replaceAll("[^a-zA-Z0-9._-]", "_");
+        return base.isBlank() ? "firmware.bin" : base;
     }
 
     private String hmac(String data) {
