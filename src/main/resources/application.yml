@@ -90,6 +90,11 @@ skb:
   theta-retr: 0.55
   theta-retr-cross-lingual: 0.45
   theta-check: 0.6
+  # 高频问答缓存：命中已校验答案时跳过 embedding/检索/LLM/校验；知识库写入即失效，TTL 兜底
+  cache:
+    enabled: true
+    ttl-seconds: 300
+    max-entries: 500
 management:
   endpoints:
     web:

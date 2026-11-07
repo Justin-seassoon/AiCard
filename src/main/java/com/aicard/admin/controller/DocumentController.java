@@ -4,6 +4,7 @@ import com.aicard.admin.dto.DocumentImportRequest;
 import com.aicard.admin.dto.DocumentSummaryDto;
 import com.aicard.common.tenant.Tenant;
 import com.aicard.common.tenant.TenantContext;
+import com.aicard.skb.cache.QaAnswerCache;
 import com.aicard.skb.model.Chunk;
 import com.aicard.skb.model.Document;
 import com.aicard.skb.provider.EmbeddingProvider;
@@ -30,11 +31,14 @@ public class DocumentController {
     private final KnowledgeStore store;
     private final EmbeddingProvider embeddings;
     private final KeywordExtractor keywordExtractor;
+    private final QaAnswerCache cache;
 
-    public DocumentController(KnowledgeStore store, EmbeddingProvider embeddings, KeywordExtractor keywordExtractor) {
+    public DocumentController(KnowledgeStore store, EmbeddingProvider embeddings,
+                              KeywordExtractor keywordExtractor, QaAnswerCache cache) {
         this.store = store;
         this.embeddings = embeddings;
         this.keywordExtractor = keywordExtractor;
+        this.cache = cache;
     }
 
     @GetMapping
@@ -57,11 +61,13 @@ public class DocumentController {
                     embeddings.embed(c.text()),
                     keywordExtractor.extract(c.text()));
         }
+        cache.invalidateAll();
         return doc.id();
     }
 
     @PostMapping("/{id}/publish")
     public void publish(@PathVariable Long id) {
         store.publishDocument(id);
+        cache.invalidateAll();
     }
 }

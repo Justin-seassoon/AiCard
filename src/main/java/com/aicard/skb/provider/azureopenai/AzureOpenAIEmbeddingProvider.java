@@ -6,6 +6,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestTemplate;
 
 import java.util.ArrayList;
@@ -23,7 +24,15 @@ public class AzureOpenAIEmbeddingProvider implements EmbeddingProvider {
     private final String endpoint;
     private final String apiKey;
     private final String deployment;
-    private final RestTemplate rest = new RestTemplate();
+    // 复用同一 RestTemplate：底层 HttpURLConnection 默认 keep-alive，避免每次提问重建 TLS 连接
+    private final RestTemplate rest = buildRestTemplate();
+
+    private static RestTemplate buildRestTemplate() {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(3_000);
+        factory.setReadTimeout(10_000);
+        return new RestTemplate(factory);
+    }
 
     public AzureOpenAIEmbeddingProvider(String endpoint, String apiKey, String deployment) {
         this.endpoint = endpoint == null ? "" : endpoint.replaceAll("/+$", "");

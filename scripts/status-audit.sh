@@ -44,6 +44,7 @@ chk "运营通知"       present f notification/service/NotificationService.java
 chk "维护/点检"      present f maintenance/service/MaintenanceService.java
 chk "OTA"            present f ota/service/OtaService.java
 chk "旁路采集"       present f ingestion/service/IngestionService.java
+chk "诊断日志"       present d diagnostic
 chk "供应商抽象(语音)" present f provider/api/SpeechProvider.java
 chk "供应商抽象(LLM)"  present f skb/provider/LLMProvider.java
 

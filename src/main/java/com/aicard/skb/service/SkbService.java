@@ -1,5 +1,6 @@
 package com.aicard.skb.service;
 
+import com.aicard.skb.cache.QaAnswerCache;
 import com.aicard.skb.model.LlmResult;
 import com.aicard.skb.model.RetrievedChunk;
 import com.aicard.skb.model.SkbResult;
@@ -7,6 +8,8 @@ import com.aicard.skb.provider.EmbeddingProvider;
 import com.aicard.skb.provider.LLMProvider;
 import com.aicard.skb.seed.KeywordExtractor;
 import com.aicard.skb.store.KnowledgeStore;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.HashSet;
 import java.util.List;
@@ -21,23 +24,26 @@ import java.util.Set;
  */
 public class SkbService {
 
+    private static final Logger log = LoggerFactory.getLogger(SkbService.class);
     private static final int TOP_K = 5;
 
     private final EmbeddingProvider embeddings;
     private final KnowledgeStore store;
     private final LLMProvider llm;
     private final KeywordExtractor keywordExtractor;
+    private final QaAnswerCache cache;
     private final double thetaRetr;
     private final double thetaRetrCrossLingual;
     private final double thetaCheck;
 
     public SkbService(EmbeddingProvider embeddings, KnowledgeStore store, LLMProvider llm,
-                      KeywordExtractor keywordExtractor, double thetaRetr,
+                      KeywordExtractor keywordExtractor, QaAnswerCache cache, double thetaRetr,
                       double thetaRetrCrossLingual, double thetaCheck) {
         this.embeddings = embeddings;
         this.store = store;
         this.llm = llm;
         this.keywordExtractor = keywordExtractor;
+        this.cache = cache;
         this.thetaRetr = thetaRetr;
         this.thetaRetrCrossLingual = thetaRetrCrossLingual;
         this.thetaCheck = thetaCheck;
@@ -66,48 +72,96 @@ public class SkbService {
 
     private LocalizedAnswer answerInternal(String question, Long customerId, Long storeId,
                                            String domain, double retrievalThreshold, String targetLang) {
-        // ① 检索段：向量为主，miss 时关键词兜底
-        List<Float> qVec = embeddings.embed(question);
-        List<RetrievedChunk> hits = store.searchSimilar(customerId, storeId, domain, qVec, TOP_K);
-        if (hits.isEmpty() || hits.get(0).similarity() < retrievalThreshold) {
-            List<String> kws = keywordExtractor.extract(question);
-            hits = kws.isEmpty() ? List.of()
-                    : store.searchByKeywords(customerId, storeId, domain, kws, TOP_K);
+        QaAnswerCache.Key key = QaAnswerCache.key(customerId, storeId, domain, targetLang,
+                retrievalThreshold, question);
+        var cached = cache.get(key);
+        if (cached.isPresent()) {
+            log.info("skb cache hit: target={} question={}", targetLang, question);
+            return cached.get();
         }
-        if (hits.isEmpty()) {
-            return new LocalizedAnswer(SkbResult.noMatch(), null);
-        }
+        LocalizedAnswer result = answerUncached(question, customerId, storeId, domain,
+                retrievalThreshold, targetLang);
+        cache.put(key, result);
+        return result;
+    }
 
-        // ② 生成段：一次调用同时产出日语答案与员工语言答案（不支持时由调用方回退翻译）
-        LlmResult llmOut;
-        String localizedAnswer = null;
-        if (targetLang == null) {
-            llmOut = llm.generate(question, hits);
-        } else {
-            LLMProvider.LocalizedLlmResult localized = llm.generateLocalized(question, hits, targetLang);
-            llmOut = new LlmResult(localized.answer(), localized.citedChunkIds());
-            localizedAnswer = localized.localizedAnswer();
-        }
+    private LocalizedAnswer answerUncached(String question, Long customerId, Long storeId,
+                                           String domain, double retrievalThreshold, String targetLang) {
+        long t0 = System.currentTimeMillis();
+        long embedMs = 0;
+        long searchMs = 0;
+        long llmMs = 0;
+        long checkMs = 0;
+        boolean keyword = false;
+        int hitCount = 0;
+        double topSim = 0;
+        double checkSim = 0;
+        String reason = null;
+        try {
+            // ① 检索段：向量为主，miss 时关键词兜底
+            List<Float> qVec = embeddings.embed(question);
+            embedMs = System.currentTimeMillis() - t0;
+            long t = System.currentTimeMillis();
+            List<RetrievedChunk> hits = store.searchSimilar(customerId, storeId, domain, qVec, TOP_K);
+            searchMs = System.currentTimeMillis() - t;
+            if (hits.isEmpty() || hits.get(0).similarity() < retrievalThreshold) {
+                List<String> kws = keywordExtractor.extract(question);
+                keyword = !kws.isEmpty();
+                t = System.currentTimeMillis();
+                hits = kws.isEmpty() ? List.of()
+                        : store.searchByKeywords(customerId, storeId, domain, kws, TOP_K);
+                searchMs += System.currentTimeMillis() - t;
+            }
+            hitCount = hits.size();
+            topSim = hits.isEmpty() ? 0 : hits.get(0).similarity();
+            if (hits.isEmpty()) {
+                reason = "retrieval_empty";
+                return new LocalizedAnswer(SkbResult.noMatch(), null);
+            }
 
-        // ③ 校验段（非 LLM）：引用必须 ⊆ 命中集合，答案与命中片段相似度达标
-        Set<Long> hitIds = new HashSet<>();
-        hits.forEach(c -> hitIds.add(c.chunkId()));
-        boolean citedValid = !llmOut.citedChunkIds().isEmpty()
-                && hitIds.containsAll(llmOut.citedChunkIds());
-        if (!citedValid) {
-            return new LocalizedAnswer(SkbResult.noMatch(), null);
-        }
+            // ② 生成段：一次调用同时产出日语答案与员工语言答案（不支持时由调用方回退翻译）
+            t = System.currentTimeMillis();
+            LlmResult llmOut;
+            String localizedAnswer = null;
+            if (targetLang == null) {
+                llmOut = llm.generate(question, hits);
+            } else {
+                LLMProvider.LocalizedLlmResult localized = llm.generateLocalized(question, hits, targetLang);
+                llmOut = new LlmResult(localized.answer(), localized.citedChunkIds());
+                localizedAnswer = localized.localizedAnswer();
+            }
+            llmMs = System.currentTimeMillis() - t;
 
-        List<RetrievedChunk> cited = hits.stream()
-                .filter(c -> llmOut.citedChunkIds().contains(c.chunkId())).toList();
-        double sim = maxSimilarity(llmOut.answer(), cited);
-        if (sim < thetaCheck) {
-            return new LocalizedAnswer(SkbResult.noMatch(), null);
-        }
+            // ③ 校验段（非 LLM）：引用必须 ⊆ 命中集合，答案与命中片段相似度达标
+            t = System.currentTimeMillis();
+            Set<Long> hitIds = new HashSet<>();
+            hits.forEach(c -> hitIds.add(c.chunkId()));
+            boolean citedValid = !llmOut.citedChunkIds().isEmpty()
+                    && hitIds.containsAll(llmOut.citedChunkIds());
+            if (!citedValid) {
+                reason = "citation";
+                return new LocalizedAnswer(SkbResult.noMatch(), null);
+            }
 
-        List<String> sourceRefs = cited.stream()
-                .map(c -> c.documentTitle() + "@" + c.version() + "#" + c.chunkId()).toList();
-        return new LocalizedAnswer(SkbResult.ok(llmOut.answer(), sourceRefs), localizedAnswer);
+            List<RetrievedChunk> cited = hits.stream()
+                    .filter(c -> llmOut.citedChunkIds().contains(c.chunkId())).toList();
+            checkSim = maxSimilarity(llmOut.answer(), cited);
+            checkMs = System.currentTimeMillis() - t;
+            if (checkSim < thetaCheck) {
+                reason = "similarity";
+                return new LocalizedAnswer(SkbResult.noMatch(), null);
+            }
+
+            List<String> sourceRefs = cited.stream()
+                    .map(c -> c.documentTitle() + "@" + c.version() + "#" + c.chunkId()).toList();
+            return new LocalizedAnswer(SkbResult.ok(llmOut.answer(), sourceRefs), localizedAnswer);
+        } finally {
+            log.info("skb timings: target={} status={} reason={} top={} sim={} embed_q={}ms search={}ms keyword={} llm={}ms check={}ms hits={} total={}ms",
+                    targetLang, reason == null ? "ok" : "no_match", reason,
+                    String.format("%.3f", topSim), String.format("%.3f", checkSim),
+                    embedMs, searchMs, keyword, llmMs, checkMs, hitCount,
+                    System.currentTimeMillis() - t0);
+        }
     }
 
     private double maxSimilarity(String answer, List<RetrievedChunk> cited) {

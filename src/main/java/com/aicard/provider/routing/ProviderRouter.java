@@ -8,6 +8,7 @@ import com.aicard.provider.api.TurnSession;
 import com.aicard.provider.metrics.ProviderMetrics;
 
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -68,6 +69,35 @@ public class ProviderRouter implements SpeechProvider {
         return call("tts",
                 () -> primary.synthesize(text, language),
                 () -> fallback.synthesize(text, language));
+    }
+
+    /** 流式 TTS：仅在主供应商尚未发出任何音频时才能切备选，已发音频则直接抛（不能中途重播）。 */
+    @Override
+    public void synthesizeStream(String text, String language, Consumer<byte[]> onAudioChunk) {
+        AtomicBoolean emitted = new AtomicBoolean();
+        Consumer<byte[]> tracking = chunk -> {
+            if (chunk != null && chunk.length > 0) {
+                emitted.set(true);
+            }
+            onAudioChunk.accept(chunk);
+        };
+        try {
+            primary.synthesizeStream(text, language, tracking);
+            metrics.recordSuccess(primary.name(), "tts");
+            return;
+        } catch (ProviderException e) {
+            metrics.recordFailure(primary.name(), "tts");
+            if (emitted.get()) {
+                throw e;
+            }
+        }
+        try {
+            fallback.synthesizeStream(text, language, onAudioChunk);
+            metrics.recordSuccess(fallback.name(), "tts");
+        } catch (ProviderException e) {
+            metrics.recordFailure(fallback.name(), "tts");
+            throw e;
+        }
     }
 
     @Override

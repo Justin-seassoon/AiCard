@@ -1,5 +1,6 @@
 package com.aicard.skb.curation;
 
+import com.aicard.skb.cache.QaAnswerCache;
 import com.aicard.skb.model.Chunk;
 import com.aicard.skb.model.Document;
 import com.aicard.skb.provider.EmbeddingProvider;
@@ -36,16 +37,18 @@ public class KnowledgeGapController {
     private final KnowledgeStore store;
     private final EmbeddingProvider embeddings;
     private final KeywordExtractor keywordExtractor;
+    private final QaAnswerCache cache;
 
     public KnowledgeGapController(GapCaptureService capture, CandidateDraftService draft, GapStore gaps,
                                   KnowledgeStore store, EmbeddingProvider embeddings,
-                                  KeywordExtractor keywordExtractor) {
+                                  KeywordExtractor keywordExtractor, QaAnswerCache cache) {
         this.capture = capture;
         this.draft = draft;
         this.gaps = gaps;
         this.store = store;
         this.embeddings = embeddings;
         this.keywordExtractor = keywordExtractor;
+        this.cache = cache;
     }
 
     @PostMapping("/capture")
@@ -93,6 +96,7 @@ public class KnowledgeGapController {
                 embeddings.embed(answer),
                 keywordExtractor.extract(gap.question()));
         gaps.markApproved(id, customerId, storeId, doc.id());
+        cache.invalidateAll();
     }
 
     @PostMapping("/{id}/reject")

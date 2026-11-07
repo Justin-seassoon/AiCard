@@ -10,6 +10,7 @@ import com.aicard.ingestion.model.QaLog;
 import com.aicard.ingestion.service.IngestionService;
 import com.aicard.provider.api.ProviderException;
 import com.aicard.provider.api.SpeechProvider;
+import com.aicard.provider.api.TranscriptionSession;
 import com.aicard.skb.model.SkbResult;
 import com.aicard.skb.provider.LLMProvider;
 import com.aicard.skb.service.SkbService;
@@ -23,8 +24,8 @@ import java.util.Locale;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 员工知识库问答处理器（P5）：缓存音频 → ASR(staff_language) → 受控 RAG → TTS 分片下发。
- * 替换联调桩 StubSkbHandler。答案 TTS 一次性合成后按 ≤8KB 分片（接口规范 §2.2/§5.2）；
+ * 员工知识库问答处理器（P5）：缓存音频 → ASR(staff_language) → 受控 RAG → TTS 流式分片下发。
+ * 替换联调桩 StubSkbHandler。答案文本先回 answer 帧，TTS 边合成边按 ≤8KB 分片下发（接口规范 §2.2/§5.2）；
  * 无依据命中回「暂无明确说明」（answer 帧，非 error）。
  *
  * <p>多语言：知识库为日语，员工语言由 {@code staff_language} 决定。非日语员工的问题先翻译成日语再检索，
@@ -41,7 +42,9 @@ public class SkbHandlerImpl implements SkbHandler {
     private final SkbService service;
     private final IngestionService ingestion;
     private final LLMProvider llm;
-    private final ConcurrentHashMap<String, ByteArrayOutputStream> buffers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, TurnAsr> asrTurns = new ConcurrentHashMap<>();
+    /** sessionId → 当前 turnId 的映射：新 turn 到来时取消上一轮残留的识别会话，避免 Azure 会话泄漏。 */
+    private final ConcurrentHashMap<String, String> currentTurn = new ConcurrentHashMap<>();
 
     public SkbHandlerImpl(SpeechProvider speech, SkbService service, IngestionService ingestion,
                           LLMProvider llm) {
@@ -53,20 +56,62 @@ public class SkbHandlerImpl implements SkbHandler {
 
     @Override
     public void onAudioChunk(SessionContext ctx, AudioChunkFrame frame) {
-        buffers.computeIfAbsent(frame.turnId(), t -> new ByteArrayOutputStream())
-                .writeBytes(frame.audio());
+        String key = turnKey(ctx, frame.turnId());
+        String previous = currentTurn.put(ctx.sessionId(), key);
+        if (previous != null && !previous.equals(key)) {
+            TurnAsr stale = asrTurns.remove(previous);
+            if (stale != null && stale.session != null) {
+                try {
+                    stale.session.cancel();
+                } catch (RuntimeException ignored) {
+                    // 上一轮会话已失效
+                }
+            }
+        }
+        TurnAsr turn = asrTurns.computeIfAbsent(key, k -> new TurnAsr());
+        if (!turn.fallback) {
+            if (turn.session == null) {
+                try {
+                    turn.session = speech.startTranscription(normalizeLanguage(ctx.staffLanguage()));
+                } catch (RuntimeException e) {
+                    log.warn("staff_qa streaming asr unavailable, fallback to buffer: {}", e.getMessage());
+                }
+                if (turn.session == null) {
+                    turn.fallback = true;
+                }
+            }
+            if (turn.session != null) {
+                try {
+                    turn.session.push(frame.audio());
+                    return;
+                } catch (RuntimeException e) {
+                    log.warn("staff_qa streaming asr push failed, fallback to buffer: {}", e.getMessage());
+                    try {
+                        turn.session.cancel();
+                    } catch (RuntimeException ignored) {
+                        // 会话已失效
+                    }
+                    turn.session = null;
+                    turn.fallback = true;
+                }
+            }
+        }
+        turn.buffer.writeBytes(frame.audio());
     }
 
     @Override
     public void onEndOfUtterance(SessionContext ctx, InboundMessage msg) {
         long t0 = System.currentTimeMillis();
         String turnId = msg.turnId();
-        byte[] audio = extract(turnId);
+        TurnAsr turn = asrTurns.remove(turnKey(ctx, turnId));
+        currentTurn.remove(ctx.sessionId(), turnKey(ctx, turnId));
         String language = normalizeLanguage(ctx.staffLanguage());
 
         String question;
         try {
-            question = speech.transcribe(audio, language);
+            question = turn != null && turn.session != null
+                    ? turn.session.finish()
+                    : speech.transcribe(turn == null ? new byte[0] : turn.buffer.toByteArray(), language);
         } catch (ProviderException e) {
             ctx.sendText(error(ctx, turnId, "E_ASR_FAIL", "请再说一遍"));
             return;
@@ -135,20 +180,20 @@ public class SkbHandlerImpl implements SkbHandler {
                 .text(answer).sourceRefs(result.sourceRefs()).build());
 
         long tTts = System.currentTimeMillis();
-        byte[] tts;
+        TtsChunkStreamer streamer = new TtsChunkStreamer(ctx, turnId, tTts);
         try {
-            tts = speech.synthesize(answer, language);
+            speech.synthesizeStream(answer, language, streamer::accept);
         } catch (ProviderException e) {
             ctx.sendText(error(ctx, turnId, "E_PROVIDER", "服务暂不可用，稍后再试"));
             return;
         }
+        long firstChunkMs = streamer.finish();
         long ttsMs = System.currentTimeMillis() - tTts;
 
-        sendTtsChunk(ctx, turnId, tts);
         ctx.sendText(OutboundMessage.builder()
                 .type("tts_end").sessionId(ctx.sessionId()).turnId(turnId).build());
-        log.info("staff_qa timings: lang={} asr={}ms question={}ms rag={}ms translate={}ms tts={}ms total={}ms",
-                language, asrMs, questionMs, ragMs, translateMs, ttsMs, System.currentTimeMillis() - t0);
+        log.info("staff_qa timings: lang={} asr={}ms question={}ms rag={}ms translate={}ms tts_first={}ms tts={}ms total={}ms",
+                language, asrMs, questionMs, ragMs, translateMs, firstChunkMs, ttsMs, System.currentTimeMillis() - t0);
     }
 
     private static String normalizeLanguage(String language) {
@@ -160,16 +205,58 @@ public class SkbHandlerImpl implements SkbHandler {
         return "ja".equals(l) || l.startsWith("ja-");
     }
 
-    private byte[] extract(String turnId) {
-        ByteArrayOutputStream b = buffers.remove(turnId);
-        return b == null ? new byte[0] : b.toByteArray();
+    private static String turnKey(SessionContext ctx, String turnId) {
+        return ctx.sessionId() + "/" + turnId;
     }
 
-    /** 单个 TTS 音频块按 ≤8KB 分片下发（接口规范 §9 单帧上限）。 */
-    private void sendTtsChunk(SessionContext ctx, String turnId, byte[] chunk) {
-        for (int off = 0; off < chunk.length; off += CHUNK_SIZE) {
-            int len = Math.min(CHUNK_SIZE, chunk.length - off);
-            ctx.sendTtsAudio(new TtsAudioFrame(turnId, Arrays.copyOfRange(chunk, off, off + len)));
+    /** 一轮问答的音频侧状态：优先流式 ASR，启动失败时退回整段缓存后一次性识别。 */
+    private static final class TurnAsr {
+        private final ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        private TranscriptionSession session;
+        private boolean fallback;
+    }
+
+    /** 流式 TTS 分片下发：累积供应商回调的音频，按 ≤8KB 切帧边收边发（接口规范 §9 单帧上限）。 */
+    private static final class TtsChunkStreamer {
+        private final SessionContext ctx;
+        private final String turnId;
+        private final long startedAt;
+        private final ByteArrayOutputStream pending = new ByteArrayOutputStream();
+        private long firstChunkMs = -1;
+
+        TtsChunkStreamer(SessionContext ctx, String turnId, long startedAt) {
+            this.ctx = ctx;
+            this.turnId = turnId;
+            this.startedAt = startedAt;
+        }
+
+        synchronized void accept(byte[] chunk) {
+            if (chunk == null || chunk.length == 0) {
+                return;
+            }
+            if (firstChunkMs < 0) {
+                firstChunkMs = System.currentTimeMillis() - startedAt;
+            }
+            pending.writeBytes(chunk);
+            while (pending.size() >= CHUNK_SIZE) {
+                byte[] all = pending.toByteArray();
+                sendChunk(Arrays.copyOfRange(all, 0, CHUNK_SIZE));
+                pending.reset();
+                pending.write(all, CHUNK_SIZE, all.length - CHUNK_SIZE);
+            }
+        }
+
+        /** 下发不足一帧的余量，返回首片时延（毫秒；未产生音频时为 -1）。 */
+        synchronized long finish() {
+            if (pending.size() > 0) {
+                sendChunk(pending.toByteArray());
+                pending.reset();
+            }
+            return firstChunkMs;
+        }
+
+        private void sendChunk(byte[] chunk) {
+            ctx.sendTtsAudio(new TtsAudioFrame(turnId, chunk));
         }
     }
 

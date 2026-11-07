@@ -8,6 +8,7 @@ import com.aicard.gateway.session.SessionContext;
 import com.aicard.ingestion.service.IngestionService;
 import com.aicard.provider.api.ProviderException;
 import com.aicard.provider.api.SpeechProvider;
+import com.aicard.provider.api.TranscriptionSession;
 import com.aicard.skb.model.SkbResult;
 import com.aicard.skb.provider.LLMProvider;
 import com.aicard.skb.service.SkbService;
@@ -15,7 +16,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
@@ -40,7 +43,10 @@ class SkbHandlerImplTest {
         handler = new SkbHandlerImpl(speech, skb, ingestion, llm);
         texts = new ArrayList<>();
         audio = new ArrayList<>();
-        when(speech.synthesize(anyString(), anyString())).thenReturn(new byte[]{1, 2, 3});
+        doAnswer(inv -> {
+            inv.<Consumer<byte[]>>getArgument(2).accept(new byte[]{1, 2, 3});
+            return null;
+        }).when(speech).synthesizeStream(anyString(), anyString(), any());
     }
 
     @Test
@@ -52,7 +58,7 @@ class SkbHandlerImplTest {
         ask(ctx("ja-JP"));
 
         verify(llm, never()).translate(anyString(), anyString());
-        verify(speech).synthesize("朝食は7時からです", "ja-JP");
+        verify(speech).synthesizeStream(eq("朝食は7時からです"), eq("ja-JP"), any());
         assertThat(answerText()).isEqualTo("朝食は7時からです");
     }
 
@@ -68,7 +74,7 @@ class SkbHandlerImplTest {
         verify(speech).transcribe(any(), eq("zh-CN"));
         verify(llm, never()).translate(anyString(), anyString());
         verify(skb).answerLocalized("早餐几点开始？", 7L, 8L, "skb", "zh-CN");
-        verify(speech).synthesize("早餐7点开始。", "zh-CN");
+        verify(speech).synthesizeStream(eq("早餐7点开始。"), eq("zh-CN"), any());
         assertThat(answerText()).isEqualTo("早餐7点开始。");
     }
 
@@ -86,7 +92,7 @@ class SkbHandlerImplTest {
 
         verify(llm).translate("早餐几点开始？", "ja-JP");
         verify(skb).answerLocalized("朝食は何時ですか", 7L, 8L, "skb", "zh-CN");
-        verify(speech).synthesize("早餐7点开始。", "zh-CN");
+        verify(speech).synthesizeStream(eq("早餐7点开始。"), eq("zh-CN"), any());
         assertThat(answerText()).isEqualTo("早餐7点开始。");
     }
 
@@ -101,7 +107,7 @@ class SkbHandlerImplTest {
 
         ask(ctx("en-US"));
 
-        verify(speech).synthesize("There is no clear answer in the knowledge base.", "en-US");
+        verify(speech).synthesizeStream(eq("There is no clear answer in the knowledge base."), eq("en-US"), any());
     }
 
     @Test
@@ -115,7 +121,67 @@ class SkbHandlerImplTest {
         ask(ctx("vi-VN"));
 
         assertThat(texts).anyMatch(m -> "error".equals(m.type()) && "E_PROVIDER".equals(m.code()));
-        verify(speech, never()).synthesize(anyString(), anyString());
+        verify(speech, never()).synthesizeStream(anyString(), anyString(), any());
+    }
+
+    @Test
+    void streamsTtsInAtMost8KbFramesThenTtsEnd() {
+        when(speech.transcribe(any(), eq("ja-JP"))).thenReturn("朝食は何時ですか");
+        when(skb.answer("朝食は何時ですか", 7L, 8L, "skb"))
+                .thenReturn(SkbResult.ok("朝食は7時からです", List.of("FAQ#1")));
+        byte[] tts = new byte[9000];
+        for (int i = 0; i < tts.length; i++) {
+            tts[i] = (byte) i;
+        }
+        doAnswer(inv -> {
+            Consumer<byte[]> onChunk = inv.getArgument(2);
+            onChunk.accept(Arrays.copyOfRange(tts, 0, 3000));
+            onChunk.accept(Arrays.copyOfRange(tts, 3000, 9000));
+            return null;
+        }).when(speech).synthesizeStream(anyString(), anyString(), any());
+
+        ask(ctx("ja-JP"));
+
+        assertThat(audio).hasSize(2);
+        assertThat(audio.get(0).turnId()).isEqualTo("t1");
+        assertThat(audio.get(0).audio()).hasSize(8000);
+        assertThat(audio.get(1).audio()).hasSize(1000);
+        byte[] joined = new byte[tts.length];
+        System.arraycopy(audio.get(0).audio(), 0, joined, 0, 8000);
+        System.arraycopy(audio.get(1).audio(), 0, joined, 8000, 1000);
+        assertThat(joined).isEqualTo(tts);
+        assertThat(texts).anyMatch(m -> "tts_end".equals(m.type()));
+    }
+
+    @Test
+    void ttsStreamFailureReturnsProviderErrorWithoutTtsEnd() {
+        when(speech.transcribe(any(), eq("ja-JP"))).thenReturn("朝食は何時ですか");
+        when(skb.answer("朝食は何時ですか", 7L, 8L, "skb"))
+                .thenReturn(SkbResult.ok("朝食は7時からです", List.of("FAQ#1")));
+        doThrow(new ProviderException("tts down"))
+                .when(speech).synthesizeStream(anyString(), anyString(), any());
+
+        ask(ctx("ja-JP"));
+
+        assertThat(texts).anyMatch(m -> "error".equals(m.type()) && "E_PROVIDER".equals(m.code()));
+        assertThat(texts).noneMatch(m -> "tts_end".equals(m.type()));
+        assertThat(audio).isEmpty();
+    }
+
+    @Test
+    void streamsAsrWhenProviderSupportsIt() {
+        TranscriptionSession asr = mock(TranscriptionSession.class);
+        when(speech.startTranscription("ja-JP")).thenReturn(asr);
+        when(asr.finish()).thenReturn("朝食は何時ですか");
+        when(skb.answer("朝食は何時ですか", 7L, 8L, "skb"))
+                .thenReturn(SkbResult.ok("朝食は7時からです", List.of("FAQ#1")));
+
+        ask(ctx("ja-JP"));
+
+        verify(asr).push(any());
+        verify(asr).finish();
+        verify(speech, never()).transcribe(any(), anyString());
+        assertThat(answerText()).isEqualTo("朝食は7時からです");
     }
 
     private SessionContext ctx(String staffLanguage) {

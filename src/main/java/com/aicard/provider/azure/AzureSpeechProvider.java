@@ -4,13 +4,17 @@ import com.aicard.provider.api.LidResult;
 import com.aicard.provider.api.ProviderException;
 import com.aicard.provider.api.SpeechProvider;
 import com.aicard.provider.api.SpeechTranslationResult;
+import com.aicard.provider.api.TranscriptionSession;
 import com.aicard.provider.api.TurnSession;
 import com.microsoft.cognitiveservices.speech.AutoDetectSourceLanguageConfig;
+import com.microsoft.cognitiveservices.speech.CancellationReason;
 import com.microsoft.cognitiveservices.speech.PropertyId;
 import com.microsoft.cognitiveservices.speech.ResultReason;
 import com.microsoft.cognitiveservices.speech.SpeechConfig;
 import com.microsoft.cognitiveservices.speech.SpeechRecognitionResult;
 import com.microsoft.cognitiveservices.speech.SpeechRecognizer;
+import com.microsoft.cognitiveservices.speech.SpeechSynthesisOutputFormat;
+import com.microsoft.cognitiveservices.speech.SpeechSynthesisResult;
 import com.microsoft.cognitiveservices.speech.SpeechSynthesizer;
 import com.microsoft.cognitiveservices.speech.audio.AudioConfig;
 import com.microsoft.cognitiveservices.speech.audio.AudioInputStream;
@@ -24,6 +28,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -120,6 +125,45 @@ public class AzureSpeechProvider implements SpeechProvider {
     }
 
     @Override
+    public TranscriptionSession startTranscription(String language) {
+        SpeechConfig config = SpeechConfig.fromSubscription(key, region);
+        config.setSpeechRecognitionLanguage(toLocale(language));
+        PushAudioInputStream pushStream = AudioInputStream.createPushStream(
+                AudioStreamFormat.getWaveFormatPCM(SAMPLE_RATE, BITS_PER_SAMPLE, CHANNELS));
+        AudioConfig audioConfig = AudioConfig.fromStreamInput(pushStream);
+        SpeechRecognizer recognizer = new SpeechRecognizer(config, audioConfig);
+
+        StringBuilder text = new StringBuilder();
+        AtomicReference<String> error = new AtomicReference<>();
+        CountDownLatch stopped = new CountDownLatch(1);
+
+        recognizer.recognized.addEventListener((o, e) -> {
+            SpeechRecognitionResult r = e.getResult();
+            if (r.getReason() == ResultReason.RecognizedSpeech && r.getText() != null) {
+                text.append(r.getText());
+            }
+        });
+        recognizer.canceled.addEventListener((o, e) -> {
+            if (e.getReason() == CancellationReason.Error) {
+                error.compareAndSet(null, e.getErrorDetails());
+            }
+        });
+        recognizer.sessionStopped.addEventListener((o, e) -> stopped.countDown());
+
+        try {
+            recognizer.startContinuousRecognitionAsync().get();
+        } catch (Exception e) {
+            try {
+                recognizer.close();
+            } catch (Exception ignored) {
+                // 启动失败时关闭识别器异常可忽略
+            }
+            throw new ProviderException("azure asr stream start failed", e);
+        }
+        return new AzureTranscriptionSession(pushStream, recognizer, text, error, stopped);
+    }
+
+    @Override
     public String transcribe(byte[] audio, String language) {
         SpeechConfig config = SpeechConfig.fromSubscription(key, region);
         config.setSpeechRecognitionLanguage(toLocale(language));
@@ -155,6 +199,55 @@ public class AzureSpeechProvider implements SpeechProvider {
         } catch (Exception e) {
             throw new ProviderException("azure tts failed", e);
         }
+    }
+
+    @Override
+    public void synthesizeStream(String text, String language, Consumer<byte[]> onAudioChunk) {
+        SpeechConfig config = SpeechConfig.fromSubscription(key, region);
+        applySynthesisVoice(config, language);
+        // 裸 PCM 输出：分片可直接下发，仅首片补 44 字节 WAV 头
+        config.setSpeechSynthesisOutputFormat(SpeechSynthesisOutputFormat.Raw16Khz16BitMonoPcm);
+        AtomicBoolean headerSent = new AtomicBoolean();
+        AtomicReference<RuntimeException> callbackError = new AtomicReference<>();
+        try (SpeechSynthesizer synthesizer = new SpeechSynthesizer(config, null)) {
+            synthesizer.Synthesizing.addEventListener((o, e) -> {
+                byte[] chunk = e.getResult().getAudioData();
+                if (chunk == null || chunk.length == 0) {
+                    return;
+                }
+                try {
+                    onAudioChunk.accept(headerSent.compareAndSet(false, true)
+                            ? concat(streamingWavHeader(), chunk) : chunk);
+                } catch (RuntimeException ex) {
+                    // SDK 线程会吞掉监听器异常，先记录，主流程结束后再抛
+                    callbackError.compareAndSet(null, ex);
+                }
+            });
+            SpeechSynthesisResult result = synthesizer.SpeakTextAsync(text).get();
+            RuntimeException error = callbackError.get();
+            if (error != null) {
+                throw new ProviderException("azure tts stream callback failed", error);
+            }
+            if (result.getReason() != ResultReason.SynthesizingAudioCompleted) {
+                throw new ProviderException("azure tts failed: " + result.getReason());
+            }
+        } catch (ProviderException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new ProviderException("azure tts failed", e);
+        }
+    }
+
+    /** 流式首片 WAV 头：总长度未知，RIFF/data 长度写 0（端侧跳过 44 字节头，以 tts_end 为结束）。 */
+    private static byte[] streamingWavHeader() {
+        return addWavHeader(new byte[0]);
+    }
+
+    private static byte[] concat(byte[] a, byte[] b) {
+        byte[] out = new byte[a.length + b.length];
+        System.arraycopy(a, 0, out, 0, a.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
     }
 
     /** 剥离所有 WAV 头（Synthesizing 事件累积的是多个完整 WAV 拼接），拼接为裸 PCM。 */
@@ -315,6 +408,84 @@ public class AzureSpeechProvider implements SpeechProvider {
         }
 
         return new AzureTurnSession(pushStream, recognizer, finalText, translatedText, detectedLanguage, done);
+    }
+
+    /** 流式 ASR：跨多次 push 复用同一 recognizer；finish 关流后取最终文本，cancel 打断清理。 */
+    private static final class AzureTranscriptionSession implements TranscriptionSession {
+
+        private final PushAudioInputStream pushStream;
+        private final SpeechRecognizer recognizer;
+        private final StringBuilder text;
+        private final AtomicReference<String> error;
+        private final CountDownLatch stopped;
+
+        AzureTranscriptionSession(PushAudioInputStream pushStream, SpeechRecognizer recognizer,
+                                  StringBuilder text, AtomicReference<String> error, CountDownLatch stopped) {
+            this.pushStream = pushStream;
+            this.recognizer = recognizer;
+            this.text = text;
+            this.error = error;
+            this.stopped = stopped;
+        }
+
+        @Override
+        public void push(byte[] audioChunk) {
+            try {
+                pushStream.write(audioChunk);
+            } catch (Exception e) {
+                throw new ProviderException("azure asr stream push failed", e);
+            }
+        }
+
+        @Override
+        public String finish() {
+            try {
+                pushStream.close();
+                stopped.await(10, TimeUnit.SECONDS);
+                String result = text.toString().trim();
+                if (result.isEmpty()) {
+                    String err = error.get();
+                    throw new ProviderException(err == null ? "azure asr failed: no result"
+                            : "azure asr failed: " + err);
+                }
+                return result;
+            } catch (ProviderException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ProviderException("azure asr failed", e);
+            } finally {
+                try {
+                    recognizer.stopContinuousRecognitionAsync().get(3, TimeUnit.SECONDS);
+                } catch (Exception ignored) {
+                    // 会话已自然结束
+                }
+                try {
+                    recognizer.close();
+                } catch (Exception ignored) {
+                    // 关闭识别器异常可忽略
+                }
+            }
+        }
+
+        @Override
+        public void cancel() {
+            try {
+                recognizer.stopContinuousRecognitionAsync().get(3, TimeUnit.SECONDS);
+            } catch (Exception ignored) {
+                // 打断时忽略停流异常
+            } finally {
+                try {
+                    recognizer.close();
+                } catch (Exception ignored) {
+                    // 关闭识别器异常可忽略
+                }
+                try {
+                    pushStream.close();
+                } catch (Exception ignored) {
+                    // 流可能已关
+                }
+            }
+        }
     }
 
     /** 流式 turn：跨多次 push 复用同一 recognizer；finish 关流收口，cancel 打断清理。 */

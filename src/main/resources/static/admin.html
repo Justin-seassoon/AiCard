@@ -118,6 +118,7 @@
     <button class="tab" data-tab="docgen">社内文书</button>
     <button class="tab" data-tab="meeting">会议纪要</button>
     <button class="tab" data-tab="agent">任务执行</button>
+    <button class="tab" data-tab="devlog">诊断日志</button>
   </nav>
 
   <!-- ==================== 周报 / 月报 ==================== -->
@@ -475,6 +476,48 @@
       </div>
     </div>
   </section>
+
+  <!-- ==================== 诊断日志 ==================== -->
+  <section id="panel-devlog" class="panel">
+    <div class="card">
+      <h2>下载最新日志</h2>
+      <p style="color:#6E685C;font-size:13px;margin:-4px 0 12px;">
+        输入设备 ID，一键下载该设备最近上传的一条诊断日志（端侧联调用，无需先翻列表）。
+      </p>
+      <div class="form-grid">
+        <div class="field"><label>设备ID <span class="req">*</span></label><input id="dlog-latest-device" placeholder="device-001"></div>
+        <div class="field" style="display:flex;align-items:flex-end;">
+          <button class="primary" onclick="downloadLatestDeviceLog()">下载最新日志</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>设备诊断日志</h2>
+      <p style="color:#6E685C;font-size:13px;margin:-4px 0 12px;">
+        端侧经 <code>POST /api/v1/device/logs</code> 上传的诊断日志；此处查询索引并下载文本（gzip 自动解压）。时间筛选按上传时间。
+      </p>
+      <div class="form-grid">
+        <div class="field"><label>设备ID</label><input id="dlog-device" placeholder="device-001"></div>
+        <div class="field"><label>会议ID</label><input id="dlog-meeting" placeholder="可空"></div>
+        <div class="field"><label>条数</label><input id="dlog-limit" type="number" value="100" min="1" max="200"></div>
+        <div class="field"><label>上传起始</label><input id="dlog-from" type="datetime-local"></div>
+        <div class="field"><label>上传结束</label><input id="dlog-to" type="datetime-local"></div>
+        <div class="field" style="display:flex;align-items:flex-end;">
+          <button class="secondary" onclick="loadDeviceLogs()">查询</button>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px;">
+        <table>
+          <thead><tr>
+            <th>设备ID</th><th>会议ID</th><th>固件</th><th>级别</th><th>采集起</th><th>采集止</th><th>大小</th><th>原始</th><th>压缩</th><th>上传时间</th><th>过期时间</th><th>操作</th>
+          </tr></thead>
+          <tbody id="dlog-tbody"></tbody>
+        </table>
+        <div class="empty" id="dlog-empty" style="display:none;">暂无诊断日志</div>
+      </div>
+    </div>
+  </section>
 </div>
 
 <!-- modal -->
@@ -535,7 +578,7 @@
       document.querySelectorAll('.panel').forEach(function (p) { p.classList.remove('active'); });
       btn.classList.add('active');
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks, gap: loadGaps, docgen: loadDocgen, meeting: loadMeetings, agent: loadAgentTasks };
+      var loader = { report: loadReports, notification: loadNotifications, order: loadOrders, inspection: loadTasks, gap: loadGaps, docgen: loadDocgen, meeting: loadMeetings, agent: loadAgentTasks, devlog: loadDeviceLogs };
       loader[btn.dataset.tab]();
     });
   });
@@ -963,6 +1006,67 @@
       var body = '<pre style="white-space:pre-wrap;font-size:12px;">' + escapeHtml(JSON.stringify(t.steps, null, 2)) + '</pre>';
       openModal('<h3>任务 #' + t.id + '</h3>' + head + body);
     }).catch(function (e) { toast('加载失败：' + e.message, false); });
+  }
+
+  // ==================== 设备诊断日志 ====================
+  var DEVLOG_LEVEL = { debug: ['DEBUG', 'gray'], info: ['INFO', 'blue'], warn: ['WARN', 'orange'], error: ['ERROR', 'red'] };
+  function fmtBytes(n) {
+    if (n == null) return '—';
+    n = Number(n);
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1024 / 1024).toFixed(2) + ' MB';
+  }
+  function loadDeviceLogs() {
+    var q = [];
+    var deviceId = document.getElementById('dlog-device').value.trim();
+    var meetingId = document.getElementById('dlog-meeting').value.trim();
+    var from = document.getElementById('dlog-from').value;
+    var to = document.getElementById('dlog-to').value;
+    var limit = document.getElementById('dlog-limit').value.trim() || '100';
+    if (deviceId) q.push('deviceId=' + encodeURIComponent(deviceId));
+    if (meetingId) q.push('meeting_id=' + encodeURIComponent(meetingId));
+    if (from) q.push('from=' + encodeURIComponent(new Date(from).toISOString()));
+    if (to) q.push('to=' + encodeURIComponent(new Date(to).toISOString()));
+    q.push('limit=' + encodeURIComponent(limit));
+    api('/api/device-logs?' + q.join('&'))
+      .then(function (list) {
+        var rows = (list || []).map(function (l) {
+          return '<tr>'
+            + '<td class="mono">' + escapeHtml(l.device_id) + '</td>'
+            + '<td class="mono">' + escapeHtml(l.meeting_id || '—') + '</td>'
+            + '<td>' + escapeHtml(l.fw_version || '—') + '</td>'
+            + '<td>' + badge(DEVLOG_LEVEL, l.level) + '</td>'
+            + '<td>' + fmtTime(l.captured_from) + '</td>'
+            + '<td>' + fmtTime(l.captured_to) + '</td>'
+            + '<td>' + fmtBytes(l.size_bytes) + '</td>'
+            + '<td>' + fmtBytes(l.raw_size_bytes) + '</td>'
+            + '<td>' + (l.compressed ? 'gzip' : 'plain') + '</td>'
+            + '<td>' + fmtTime(l.created_at) + '</td>'
+            + '<td>' + fmtTime(l.expires_at) + '</td>'
+            + '<td><button class="small primary" onclick="downloadDeviceLog(\'' + escAttr(l.log_id) + '\')">下载</button></td>'
+            + '</tr>';
+        }).join('');
+        setTbody('dlog-tbody', rows, 'dlog-empty', (list || []).length);
+      })
+      .catch(function (e) { toast('查询失败：' + e.message, false); });
+  }
+  function downloadDeviceLog(logId) {
+    fetch('/api/device-logs/' + encodeURIComponent(logId), { headers: { 'X-Customer-Id': customerId, 'X-Store-Id': storeId } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.blob(); })
+      .then(function (blob) { downloadBlob(blob, logId + '.log'); toast('已下载', true); })
+      .catch(function (e) { toast('下载失败：' + e.message, false); });
+  }
+  function downloadLatestDeviceLog() {
+    var deviceId = document.getElementById('dlog-latest-device').value.trim();
+    if (!deviceId) { toast('请填写设备 ID', false); return; }
+    api('/api/device-logs?deviceId=' + encodeURIComponent(deviceId) + '&limit=1')
+      .then(function (list) {
+        var first = (list || [])[0];
+        if (!first || !first.log_id) { toast('该设备暂无诊断日志', false); return; }
+        downloadDeviceLog(first.log_id);
+      })
+      .catch(function (e) { toast('查询失败：' + e.message, false); });
   }
 
   // ==================== 文档处理（③ 读取 / 模板） ====================
